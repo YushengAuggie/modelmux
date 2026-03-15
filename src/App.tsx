@@ -1,10 +1,12 @@
 import { json } from '@codemirror/lang-json';
 import CodeMirror from '@uiw/react-codemirror';
 import { useEffect, useMemo, useState } from 'react';
-import { buildRequestPreview, copyAsCurl, providerOptions } from './adapters';
-import { templates } from './templates';
-import { useAppStore } from './store';
-import type { MessageItem, OpenRouterModel, ProviderId } from './types';
+import { buildRequestPreview, providerOptions } from '@/adapters';
+
+import { templates } from '@/templates';
+import { useAppStore } from '@/store';
+import { useSendRequest } from '@/hooks/useSendRequest';
+import type { MessageItem, OpenRouterModel, ProviderId } from '@/types';
 
 function formatCurrency(value?: number): string {
   if (value === undefined) {
@@ -148,13 +150,12 @@ export default function App() {
     moveMessage,
     applyTemplate,
     fetchModels,
-    send,
     replayHistory,
     deleteHistory,
     clearHistory,
   } = useAppStore();
 
-  const [streamText, setStreamText] = useState('');
+  const { streamText, send, copyRequestCurl, copyResponseText, clearStreamText } = useSendRequest();
   const [historyOpen, setHistoryOpen] = useState(true);
 
   useEffect(() => {
@@ -169,10 +170,8 @@ export default function App() {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'enter' && !isSending) {
         event.preventDefault();
-        setStreamText('');
-        void send((text) => {
-          setStreamText((curr) => curr + text);
-        });
+        clearStreamText();
+        void send();
       }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
@@ -237,21 +236,16 @@ export default function App() {
   const providerLabel = providerOptions.find((provider) => provider.id === request.provider)?.label ?? request.provider;
 
   const onSend = () => {
-    setStreamText('');
-    void send((text) => {
-      setStreamText((curr) => curr + text);
-    });
+    clearStreamText();
+    void send();
   };
 
   const onCopyCurl = async () => {
-    if (!requestPreview) {
-      return;
-    }
-    await navigator.clipboard.writeText(copyAsCurl(requestPreview));
+    await copyRequestCurl();
   };
 
   const onCopyResponseText = async () => {
-    await navigator.clipboard.writeText(responseText);
+    await copyResponseText();
   };
 
   return (
