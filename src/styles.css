@@ -87,6 +87,12 @@ textarea {
   font: inherit;
 }
 
+input,
+select,
+textarea {
+  accent-color: var(--accent);
+}
+
 button,
 input,
 select {
@@ -294,6 +300,13 @@ textarea::placeholder {
   padding: 0;
 }
 
+.primary-button--hero {
+  min-width: 180px;
+  min-height: 52px;
+  padding-inline: 22px;
+  font-size: 1rem;
+}
+
 .workspace-grid {
   display: grid;
   gap: 20px;
@@ -307,6 +320,8 @@ textarea::placeholder {
 }
 
 .surface {
+  display: grid;
+  gap: 18px;
   padding: 22px;
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
@@ -331,6 +346,12 @@ textarea::placeholder {
   font-size: clamp(1.2rem, 1rem + 0.6vw, 1.7rem);
   line-height: 1.1;
   letter-spacing: -0.03em;
+}
+
+.section-intro {
+  max-width: 60ch;
+  margin: 8px 0 0;
+  color: var(--muted);
 }
 
 .response-headline__actions,
@@ -385,7 +406,6 @@ textarea::placeholder {
 }
 
 .response-output {
-  margin-top: 18px;
   min-height: 340px;
   padding: 20px;
   border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
@@ -394,6 +414,21 @@ textarea::placeholder {
     radial-gradient(circle at top right, rgb(6 182 212 / 0.08), transparent 24%),
     linear-gradient(180deg, color-mix(in srgb, var(--bg-elevated) 92%, transparent), color-mix(in srgb, var(--bg-soft) 72%, transparent));
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+}
+
+.response-output.is-loading {
+  position: relative;
+  overflow: hidden;
+}
+
+.response-output.is-loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.08), transparent);
+  transform: translateX(-100%);
+  animation: response-sheen 1.8s linear infinite;
+  pointer-events: none;
 }
 
 .response-output pre {
@@ -406,8 +441,36 @@ textarea::placeholder {
 }
 
 .empty-state {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 8px;
+  min-height: 100%;
   margin: 0;
   color: var(--muted);
+}
+
+.empty-state__title,
+.empty-state__body {
+  margin: 0;
+}
+
+.empty-state__title {
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.empty-state__body {
+  max-width: 58ch;
+}
+
+.empty-state--compact {
+  min-height: auto;
+  padding: 14px 16px;
+  border: 1px dashed var(--border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--bg-soft) 38%, transparent);
 }
 
 .error-banner,
@@ -505,6 +568,17 @@ textarea::placeholder {
   font-weight: 600;
 }
 
+.status-pill--response.is-live {
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
+  background: color-mix(in srgb, var(--accent-soft) 92%, transparent);
+  color: var(--text);
+}
+
+.status-pill--response.is-ready {
+  border-color: color-mix(in srgb, var(--success) 48%, var(--border));
+  background: color-mix(in srgb, var(--success) 16%, transparent);
+}
+
 .provider-pills,
 .template-strip,
 .badge-row {
@@ -555,6 +629,21 @@ textarea::placeholder {
   border-radius: 16px;
   background: color-mix(in srgb, var(--bg-elevated) 88%, transparent);
   color: var(--text);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease;
+}
+
+.control-input:hover {
+  border-color: color-mix(in srgb, var(--accent) 26%, var(--border-strong));
+}
+
+.control-input:focus-visible,
+.bubble-editor:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-soft) 72%, transparent);
+  outline: none;
 }
 
 .control-input--compact {
@@ -584,6 +673,9 @@ textarea::placeholder {
 .model-results {
   display: grid;
   gap: 10px;
+  max-height: 440px;
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .model-option {
@@ -716,6 +808,13 @@ textarea::placeholder {
   font-size: 0.75rem;
 }
 
+.toggle-row input,
+.toggle-card input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
 .field-grid--metrics {
   margin-top: 6px;
 }
@@ -729,6 +828,51 @@ textarea::placeholder {
 
 .cm-editor {
   font-size: 13px;
+}
+
+.surface--action {
+  position: sticky;
+  top: 112px;
+  z-index: 20;
+}
+
+.send-panel,
+.send-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.send-panel h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  letter-spacing: -0.02em;
+}
+
+.send-panel__meta {
+  margin: 8px 0 0;
+  color: var(--text-soft);
+}
+
+.shortcut-hint {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-soft) 72%, transparent);
+  color: var(--muted);
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.76rem;
+}
+
+@keyframes response-sheen {
+  to {
+    transform: translateX(100%);
+  }
 }
 
 @media (min-width: 768px) {
@@ -764,6 +908,18 @@ textarea::placeholder {
 }
 
 @media (max-width: 767px) {
+  .workspace-grid {
+    gap: 16px;
+  }
+
+  .response-column {
+    order: 2;
+  }
+
+  .control-column {
+    order: 1;
+  }
+
   .app-header,
   .surface,
   .surface--hero {
@@ -797,6 +953,20 @@ textarea::placeholder {
     padding: 18px;
   }
 
+  .surface--action {
+    position: static;
+  }
+
+  .send-panel__actions {
+    width: 100%;
+  }
+
+  .primary-button--hero,
+  .shortcut-hint {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+
   .message-bubble__header,
   .message-bubble__meta,
   .message-bubble__actions {
@@ -805,5 +975,16 @@ textarea::placeholder {
 
   .message-bubble__actions > * {
     flex: 1 1 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
 }

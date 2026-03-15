@@ -160,6 +160,9 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
+    document.documentElement.style.colorScheme = theme;
+    const themeColor = theme === 'dark' ? '#0f172a' : '#f4f8fb';
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', themeColor);
   }, [theme]);
 
   useEffect(() => {
@@ -232,6 +235,7 @@ export default function App() {
   }, [response]);
 
   const responseText = streamText || response?.extractedText || '';
+  const hasResponse = Boolean(responseText || response?.status || response?.errorHint);
 
   const providerLabel = providerOptions.find((provider) => provider.id === request.provider)?.label ?? request.provider;
 
@@ -281,8 +285,14 @@ export default function App() {
               <div>
                 <p className="eyebrow">Response</p>
                 <h2>Inspect output first, then tune the request.</h2>
+                <p className="section-intro">
+                  The output area stays front-and-center so you can compare latency, tokens, and text without hunting.
+                </p>
               </div>
               <div className="response-headline__actions">
+                <span className={`status-pill status-pill--response ${isSending ? 'is-live' : hasResponse ? 'is-ready' : ''}`}>
+                  {isSending ? 'Streaming response' : hasResponse ? 'Response ready' : 'Waiting for request'}
+                </span>
                 <button className="secondary-button" onClick={() => void onCopyResponseText()} disabled={!responseText}>
                   Copy text
                 </button>
@@ -324,8 +334,19 @@ export default function App() {
 
             {response?.errorHint ? <div className="error-banner">{response.errorHint}</div> : null}
 
-            <article className="response-output">
-              {responseText ? <pre>{responseText}</pre> : <p className="empty-state">No response text yet. Send a request to see output here.</p>}
+            <article className={`response-output ${isSending ? 'is-loading' : ''}`} aria-live="polite">
+              {responseText ? (
+                <pre>{responseText}</pre>
+              ) : (
+                <div className="empty-state">
+                  <p className="empty-state__title">{isSending ? 'Waiting for the first tokens…' : 'No response yet'}</p>
+                  <p className="empty-state__body">
+                    {isSending
+                      ? 'The model is processing your request. Streaming text will appear here as soon as it arrives.'
+                      : 'Send a request to see output, timing, and token usage in one place.'}
+                  </p>
+                </div>
+              )}
             </article>
 
             {showRawResponse ? (
@@ -393,11 +414,30 @@ export default function App() {
         </section>
 
         <aside className="control-column">
+          <section className="surface surface--action">
+            <div className="send-panel">
+              <div>
+                <p className="eyebrow">Send</p>
+                <h3>Run the current request</h3>
+                <p className="send-panel__meta">
+                  {request.model ? request.model : 'Choose a model, then send'} · {isSending ? 'Request in progress' : 'Ready'}
+                </p>
+              </div>
+              <div className="send-panel__actions">
+                <span className="shortcut-hint">Cmd/Ctrl + Enter</span>
+                <button className="primary-button primary-button--hero" onClick={onSend} disabled={isSending}>
+                  {isSending ? 'Sending…' : 'Send request'}
+                </button>
+              </div>
+            </div>
+          </section>
+
           <section className="surface">
             <div className="section-heading">
               <div>
                 <p className="eyebrow">Request setup</p>
                 <h3>Choose provider and model</h3>
+                <p className="section-intro">Pick the target model quickly, then refine the prompt and payload below.</p>
               </div>
               <button className="ghost-button" onClick={() => void fetchModels(true)}>
                 Refresh models
@@ -490,6 +530,9 @@ export default function App() {
                   </button>
                 ))}
               </div>
+              {!modelsLoading && filteredModels.length === 0 ? (
+                <p className="empty-state empty-state--compact">No models match this search for the current provider.</p>
+              ) : null}
             </div>
 
             <div className="selected-model-card">
@@ -508,6 +551,7 @@ export default function App() {
               <div>
                 <p className="eyebrow">Prompting</p>
                 <h3>Compose the conversation</h3>
+                <p className="section-intro">Messages use the same card structure across roles to keep edits predictable.</p>
               </div>
               <button className="secondary-button" onClick={addMessage}>
                 Add message

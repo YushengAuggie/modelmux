@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -20,6 +20,22 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
+    <script>
+      (() => {
+        const fallbackTheme = 'dark';
+        try {
+          const raw = localStorage.getItem('api-pilot-store-v1');
+          const parsed = raw ? JSON.parse(raw) : null;
+          const theme = parsed?.state?.theme === 'light' || parsed?.state?.theme === 'dark' ? parsed.state.theme : fallbackTheme;
+          document.documentElement.classList.toggle('dark', theme === 'dark');
+          document.documentElement.style.colorScheme = theme;
+          document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#0f172a' : '#f4f8fb');
+        } catch {
+          document.documentElement.classList.add('dark');
+          document.documentElement.style.colorScheme = fallbackTheme;
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
