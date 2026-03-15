@@ -1,0 +1,46 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --bg: #f2f7ff;
+  --bg-soft: #e6f0ff;
+  --panel: #ffffff;
+  --border: #c7d7f5;
+  --text: #0c1222;
+  --muted: #4a5a78;
+  --accent: #0077ff;
+}
+
+.dark {
+  --bg: #1a1a2e;
+  --bg-soft: #16213e;
+  --panel: #1f2b46;
+  --border: #2f426a;
+  --text: #e9f0ff;
+  --muted: #9fb1d6;
+  --accent: #21d4fd;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at 0% 0%, rgb(33 212 253 / 0.12), transparent 28%),
+    radial-gradient(circle at 100% 100%, rgb(0 119 255 / 0.08), transparent 24%),
+    var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-family: 'JetBrains Mono', 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+}
+
+.panel {
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  border: 1px solid var(--border);
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+}
