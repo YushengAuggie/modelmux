@@ -8,6 +8,128 @@ import { useAppStore } from '@/store';
 import { useSendRequest } from '@/hooks/useSendRequest';
 import type { MessageItem, OpenRouterModel, ProviderId } from '@/types';
 
+type StatusTone = 'idle' | 'success' | 'warning' | 'error';
+
+function getStatusTone(status?: number): StatusTone {
+  if (status === undefined) return 'idle';
+  if (status >= 500) return 'error';
+  if (status >= 400) return 'warning';
+  if (status >= 200 && status < 300) return 'success';
+  return 'idle';
+}
+
+function normalizeTemplateRequest(templateRequest: Partial<import('@/types').RequestConfig>) {
+  return {
+    provider: templateRequest.provider,
+    model: templateRequest.model,
+    baseUrl: templateRequest.baseUrl,
+    systemPrompt: templateRequest.systemPrompt,
+    params: templateRequest.params,
+    messages: templateRequest.messages?.map((message) => ({
+      role: message.role,
+      content: message.content,
+      name: message.name ?? '',
+    })),
+  };
+}
+
+function normalizeCurrentRequest(request: import('@/types').RequestConfig) {
+  return {
+    provider: request.provider,
+    model: request.model,
+    baseUrl: request.baseUrl,
+    systemPrompt: request.systemPrompt,
+    params: request.params,
+    messages: request.messages.map((message) => ({
+      role: message.role,
+      content: message.content,
+      name: message.name ?? '',
+    })),
+  };
+}
+
+function requestMatchesTemplate(
+  request: import('@/types').RequestConfig,
+  templateRequest: Partial<import('@/types').RequestConfig>,
+): boolean {
+  const current = normalizeCurrentRequest(request);
+  const template = normalizeTemplateRequest(templateRequest);
+  return (
+    (template.provider === undefined || current.provider === template.provider) &&
+    (template.model === undefined || current.model === template.model) &&
+    (template.baseUrl === undefined || current.baseUrl === template.baseUrl) &&
+    (template.systemPrompt === undefined || current.systemPrompt === template.systemPrompt) &&
+    (template.params === undefined || JSON.stringify(current.params) === JSON.stringify(template.params)) &&
+    (template.messages === undefined || JSON.stringify(current.messages) === JSON.stringify(template.messages))
+  );
+}
+
+function renderJsonNode(value: unknown, depth = 0): React.ReactNode {
+  const indent = '  '.repeat(depth);
+  const nextIndent = '  '.repeat(depth + 1);
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) return <span>[]</span>;
+    return (
+      <>
+        <span>[</span>
+        {'\n'}
+        {value.map((item, index) => (
+          <span key={`${depth}-${index}`}>
+            {nextIndent}
+            {renderJsonNode(item, depth + 1)}
+            {index < value.length - 1 ? ',' : ''}
+            {'\n'}
+          </span>
+        ))}
+        {indent}
+        <span>]</span>
+      </>
+    );
+  }
+
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value);
+    if (entries.length === 0) return <span>{'{}'}</span>;
+    return (
+      <>
+        <span>{'{'}</span>
+        {'\n'}
+        {entries.map(([key, item], index) => (
+          <span key={`${depth}-${key}`}>
+            {nextIndent}
+            <span className="json-key">"{key}"</span>
+            <span>: </span>
+            {renderJsonNode(item, depth + 1)}
+            {index < entries.length - 1 ? ',' : ''}
+            {'\n'}
+          </span>
+        ))}
+        {indent}
+        <span>{'}'}</span>
+      </>
+    );
+  }
+
+  if (typeof value === 'string') {
+    return <span className="json-string">{JSON.stringify(value)}</span>;
+  }
+
+  if (typeof value === 'number') {
+    return <span className="json-number">{String(value)}</span>;
+  }
+
+  if (typeof value === 'boolean') {
+    return <span className="json-boolean">{String(value)}</span>;
+  }
+
+  if (value === null) {
+    return <span className="json-null">null</span>;
+  }
+
+  return <span>{String(value)}</span>;
+}
+
 function formatCurrency(value?: number): string {
   if (value === undefined) {
     return 'Pending';
@@ -220,6 +342,22 @@ export default function App() {
 
   const responseText = streamText || response?.extractedText || '';
   const hasResponse = Boolean(responseText || response?.status || response?.errorHint);
+  const statusTone = getStatusTone(response?.status);
+  const responseJsonPreview = useMemo(() => {
+    const trimmed = responseText.trim();
+    if (!trimmed || (!trimmed.startsWith('{') && !trimmed.startsWith('['))) {
+      return undefined;
+    }
+    try {
+      return JSON.parse(trimmed) as unknown;
+    } catch {
+      return undefined;
+    }
+  }, [responseText]);
+  const activeTemplateId = useMemo(
+    () => templates.find((template) => requestMatchesTemplate(request, template.request))?.id,
+    [request],
+  );
 
   const providerLabel = providerOptions.find((provider) => provider.id === request.provider)?.label ?? request.provider;
 
@@ -257,7 +395,14 @@ export default function App() {
             {theme === 'dark' ? 'Light mode' : 'Dark mode'}
           </button>
           <button className="primary-button primary-button--hero" onClick={onSend} disabled={isSending}>
-            {isSending ? 'Sending…' : 'Send request'}
+            {isSending ? (
+              <>
+                <span className="primary-button__spinner" aria-hidden="true" />
+                <span>Sending…</span>
+              </>
+            ) : (
+              'Send request'
+            )}
           </button>
         </div>
       </header>
@@ -292,19 +437,22 @@ export default function App() {
             </div>
 
             <div className="stats-grid">
-              <div className="stat-card">
+              <div className={`stat-card stat-card--status tone-${statusTone} ${isSending ? 'is-pulsing' : ''}`}>
                 <span className="stat-label">Status</span>
-                <strong>{response?.status ?? 'Not run yet'}</strong>
+                <strong className="status-value">
+                  <span className="status-indicator" aria-hidden="true" />
+                  <span>{response?.status ?? 'Not run yet'}</span>
+                </strong>
               </div>
-              <div className="stat-card">
+              <div className={`stat-card ${isSending ? 'is-pulsing' : ''}`}>
                 <span className="stat-label">TTFT</span>
                 <strong>{formatMs(response?.ttftMs)}</strong>
               </div>
-              <div className="stat-card">
+              <div className={`stat-card ${isSending ? 'is-pulsing' : ''}`}>
                 <span className="stat-label">Total time</span>
                 <strong>{formatMs(response?.totalMs)}</strong>
               </div>
-              <div className="stat-card">
+              <div className={`stat-card ${isSending ? 'is-pulsing' : ''}`}>
                 <span className="stat-label">Estimated cost</span>
                 <strong>{formatCurrency(response?.costEstimateUsd)}</strong>
               </div>
@@ -320,7 +468,13 @@ export default function App() {
 
             <article className={`response-output ${isSending ? 'is-loading' : ''}`} aria-live="polite">
               {responseText ? (
-                <pre>{responseText}</pre>
+                responseJsonPreview !== undefined ? (
+                  <pre className="json-response">
+                    <code>{renderJsonNode(responseJsonPreview)}</code>
+                  </pre>
+                ) : (
+                  <pre>{responseText}</pre>
+                )
               ) : (
                 <div className="empty-state">
                   <p className="empty-state__title">{isSending ? 'Waiting for the first tokens…' : 'Pick a template or build a request, then hit Send'}</p>
@@ -329,6 +483,13 @@ export default function App() {
                       ? 'The model is processing your request. Streaming text will appear here as soon as it arrives.'
                       : 'The response pane stays open here so you can compare output, timing, and token usage without digging through controls.'}
                   </p>
+                  {isSending ? (
+                    <div className="typing-indicator" aria-label="Response in progress">
+                      <span />
+                      <span />
+                      <span />
+                    </div>
+                  ) : null}
                   {!isSending ? <p className="empty-state__hint">Use the Send button in the header above and to the right ↗</p> : null}
                 </div>
               )}
@@ -375,14 +536,23 @@ export default function App() {
                   <article key={item.id} className="history-card">
                     <div className="history-card__top">
                       <div>
-                        <strong>{item.request.model}</strong>
+                        <strong className="history-card__identity">
+                          {providerOptions.find((provider) => provider.id === item.request.provider)?.label ?? item.request.provider}
+                          {' · '}
+                          {item.request.model}
+                        </strong>
                         <p>{new Date(item.timestamp).toLocaleString()}</p>
                       </div>
-                      <span className="status-pill">{item.response.status ?? 'error'}</span>
+                      <span className={`status-pill tone-${getStatusTone(item.response.status)}`}>
+                        <span className="status-indicator" aria-hidden="true" />
+                        <span>{item.response.status ?? 'error'}</span>
+                      </span>
                     </div>
                     <p className="history-meta">
-                      {item.request.provider} · {item.requestPreview.url}
+                      {item.requestPreview.url}
                     </p>
+                    <p className="history-latency">Latency: {formatMs(item.response.totalMs)}</p>
+                    <p className="history-preview">{item.response.extractedText || item.response.rawText || 'No response body captured.'}</p>
                     <div className="history-actions">
                       <button className="secondary-button" onClick={() => replayHistory(item.id)}>
                         Replay
@@ -559,7 +729,11 @@ export default function App() {
 
             <div className="template-strip" aria-label="Prompt templates">
               {templates.map((template) => (
-                <button key={template.id} className="template-chip" onClick={() => applyTemplate(template.id)}>
+                <button
+                  key={template.id}
+                  className={`template-chip ${activeTemplateId === template.id ? 'is-active' : ''}`}
+                  onClick={() => applyTemplate(template.id)}
+                >
                   <span>{template.name}</span>
                   <small>{template.description}</small>
                 </button>
