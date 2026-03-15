@@ -8,4 +8,4 @@ All notable changes to this project will be documented in this file.
 - Created [PRODUCT.md](/private/tmp/ap-product/PRODUCT.md) with product vision, personas, user stories, success metrics, feature matrix, journey map, and competitive moat.
 - Updated [FEATURES.md](/private/tmp/ap-product/FEATURES.md) with explicit P0/P1/P2 priority tags.
 - Added acceptance criteria for all P0 features to make MVP scope testable.
-- Established the first documented release boundary for API Pilot planning artifacts.
+- Established the first documented release boundary for ModelMux planning artifacts.

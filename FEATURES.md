@@ -1,4 +1,4 @@
-# FEATURES.md — API Pilot MVP
+# FEATURES.md — ModelMux MVP
 
 > The LLM API testing tool that doesn't exist yet.
 
@@ -18,7 +18,7 @@
 3. Every sent request shows extracted output plus raw request/response details, status, latency, and usage when available.
 4. Common provider-specific setup mistakes surface a readable error message with a corrective hint.
 5. The core request-send-read flow works on a phone browser without horizontal overflow or blocked actions.
-6. API keys, history, and saved state stay local in the browser and are never routed through an API Pilot backend.
+6. API keys, history, and saved state stay local in the browser and are never routed through an ModelMux backend.
 
 ### Core: Request Builder
 - [ ] **[P0] Provider picker** — OpenAI, Anthropic, Gemini, Custom (any OpenAI-compatible endpoint)

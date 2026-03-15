@@ -10,7 +10,7 @@ export interface HeaderProps {
 export function Header({ isSending, theme, onSend, onToggleTheme }: HeaderProps) {
   return (
     <header className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border p-3 panel">
-      <h1 className="text-lg font-semibold tracking-tight">API Pilot</h1>
+      <h1 className="text-lg font-semibold tracking-tight">ModelMux</h1>
       <span className="text-sm" style={{ color: 'var(--muted)' }}>
         LLM API testing tool
       </span>

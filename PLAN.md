@@ -1,8 +1,8 @@
-# API Pilot — Master Plan
+# ModelMux — Master Plan
 
 > *Test any LLM from your pocket.*
 
-**App Name:** API Pilot (working title — can change)
+**App Name:** ModelMux (working title — can change)
 **Platform:** Web first (mobile-responsive) → iOS later
 **Tech Stack:** React/Next.js or pure HTML+JS (TBD)
 **Status:** Phase 0 — Planning
@@ -168,7 +168,7 @@ api-pilot/
 
 | Decision | Options | Status |
 |----------|---------|--------|
-| App name | API Pilot / Reqo / Pinch / Fetcher / ? | TBD |
+| App name | ModelMux / Reqo / Pinch / Fetcher / ? | TBD |
 | Pricing model | Free / Freemium / Paid | TBD |
 | Open source? | Yes (builds trust) / No (monetize) | TBD |
 | SwiftUI vs UIKit | SwiftUI (modern, faster dev) | Leaning SwiftUI |

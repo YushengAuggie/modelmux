@@ -1,4 +1,4 @@
-# API Pilot
+# ModelMux
 
 Test LLM APIs fast from one clean browser UI.
 

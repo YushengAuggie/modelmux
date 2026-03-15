@@ -255,7 +255,7 @@ export default function App() {
           <div className="brand-mark">AP</div>
           <div>
             <p className="eyebrow">LLM API testing tool</p>
-            <h1>API Pilot</h1>
+            <h1>ModelMux</h1>
           </div>
         </div>
         <div className="header-actions">

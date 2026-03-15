@@ -1,4 +1,4 @@
-# API Pilot landing page concept
+# ModelMux landing page concept
 
 ## Hero
 
@@ -9,7 +9,7 @@
 
 ### One request, many providers
 
-Try OpenAI, Anthropic, Gemini, or your own OpenAI-compatible endpoint from the same UI. API Pilot maps the request into the right format for you.
+Try OpenAI, Anthropic, Gemini, or your own OpenAI-compatible endpoint from the same UI. ModelMux maps the request into the right format for you.
 
 ### Built for debugging
 

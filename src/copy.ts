@@ -1,6 +1,6 @@
 export const copy = {
   app: {
-    name: 'API Pilot',
+    name: 'ModelMux',
     tagline: 'Test LLM APIs fast',
     description:
       'Make one LLM call, inspect the raw JSON, and try the next model without leaving your browser.',

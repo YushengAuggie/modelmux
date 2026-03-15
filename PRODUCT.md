@@ -1,10 +1,10 @@
-# PRODUCT.md — API Pilot
+# PRODUCT.md — ModelMux
 
 > Ruthlessly simple LLM API testing from any browser.
 
 ## Product Vision
 
-API Pilot is the fastest way to test an LLM API from a phone or laptop. Paste an API key, pick a template or model, send one request, and immediately understand what happened. No signup, no backend, no workspace setup, no vendor lock-in.
+ModelMux is the fastest way to test an LLM API from a phone or laptop. Paste an API key, pick a template or model, send one request, and immediately understand what happened. No signup, no backend, no workspace setup, no vendor lock-in.
 
 The product wins by removing friction from fragmented LLM APIs:
 - One mobile-first UI for multiple provider formats
@@ -95,6 +95,6 @@ The product wins by removing friction from fragmented LLM APIs:
 
 ## Positioning
 
-API Pilot is not a full Postman replacement and not a hosted playground tied to one provider. It is the fastest path from “I need to test this model call” to “I know what happened,” especially on mobile.
+ModelMux is not a full Postman replacement and not a hosted playground tied to one provider. It is the fastest path from “I need to test this model call” to “I know what happened,” especially on mobile.
 
 *Created: 2026-03-14*
