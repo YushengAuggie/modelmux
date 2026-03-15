@@ -100,3 +100,9 @@ export interface AppState {
   isSending: boolean;
   history: HistoryItem[];
 }
+
+/** Provider option displayed in the request builder. */
+export interface ProviderOption {
+  id: ProviderId;
+  label: string;
+}
