@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 var srcDir = new URL('./src', import.meta.url).pathname;
 export default defineConfig({
     plugins: [react()],
-    base: '/api-pilot/',
+    base: '/modelmux/',
     resolve: {
         alias: {
             '@': srcDir,
