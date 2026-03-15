@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { buildRequestPreview, copyAsCurl, providerOptions } from './adapters';
 import { templates } from './templates';
 import { useAppStore } from './store';
-import type { MessageItem, OpenRouterModel } from './types';
+import type { MessageItem, OpenRouterModel, ProviderId } from './types';
 
 function formatCurrency(value?: number): string {
   if (value === undefined) {
@@ -22,14 +22,45 @@ function formatMs(value?: number): string {
 
 function capabilityBadges(model: OpenRouterModel): string[] {
   const badges: string[] = [];
-  if (model.supportsTools) badges.push('🔧 tools');
-  if (model.supportsSearch) badges.push('🔍 search');
-  if (model.supportsVision) badges.push('👁 vision');
-  if (model.supportsReasoning) badges.push('🧠 reasoning');
+  if (model.supportsTools) badges.push('Tools');
+  if (model.supportsSearch) badges.push('Search');
+  if (model.supportsVision) badges.push('Vision');
+  if (model.supportsReasoning) badges.push('Reasoning');
   return badges;
 }
 
-function MessageRow({
+function providerTone(provider: ProviderId): string {
+  switch (provider) {
+    case 'openai-chat':
+    case 'openai-responses':
+      return 'is-openai';
+    case 'anthropic':
+      return 'is-assistant';
+    case 'gemini':
+      return 'is-tool';
+    case 'custom':
+      return 'is-custom';
+    default:
+      return '';
+  }
+}
+
+function messageTitle(role: MessageItem['role']): string {
+  switch (role) {
+    case 'system':
+      return 'System';
+    case 'user':
+      return 'User';
+    case 'assistant':
+      return 'Assistant';
+    case 'tool':
+      return 'Tool';
+    default:
+      return role;
+  }
+}
+
+function MessageBubble({
   message,
   index,
   count,
@@ -45,61 +76,49 @@ function MessageRow({
   onMove: (id: string, direction: -1 | 1) => void;
 }) {
   return (
-    <div className="panel rounded-xl p-3 transition-all duration-200 hover:-translate-y-px">
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <select
-          className="rounded-md border px-2 py-1 text-sm"
-          style={{ borderColor: 'var(--border)', background: 'var(--bg-soft)' }}
-          value={message.role}
-          onChange={(event) => onChange(message.id, { role: event.target.value as MessageItem['role'] })}
-        >
-          <option value="system">system</option>
-          <option value="user">user</option>
-          <option value="assistant">assistant</option>
-          <option value="tool">tool</option>
-        </select>
-        {message.role === 'tool' ? (
-          <input
-            className="min-w-24 flex-1 rounded-md border px-2 py-1 text-sm"
-            style={{ borderColor: 'var(--border)', background: 'var(--bg-soft)' }}
-            placeholder="tool name"
-            value={message.name ?? ''}
-            onChange={(event) => onChange(message.id, { name: event.target.value })}
-          />
-        ) : null}
-        <div className="ml-auto flex gap-1">
-          <button
-            className="rounded-md border px-2 py-1 text-xs"
-            style={{ borderColor: 'var(--border)' }}
-            onClick={() => onMove(message.id, -1)}
-            disabled={index === 0}
+    <article className={`message-bubble ${providerTone(message.role === 'assistant' ? 'anthropic' : message.role === 'tool' ? 'gemini' : message.role === 'system' ? 'custom' : 'openai-chat')}`}>
+      <div className="message-bubble__header">
+        <div className="message-bubble__meta">
+          <span className="role-badge">{messageTitle(message.role)}</span>
+          <select
+            className="control-input control-input--compact"
+            aria-label={`Message ${index + 1} role`}
+            value={message.role}
+            onChange={(event) => onChange(message.id, { role: event.target.value as MessageItem['role'] })}
           >
+            <option value="system">system</option>
+            <option value="user">user</option>
+            <option value="assistant">assistant</option>
+            <option value="tool">tool</option>
+          </select>
+          {message.role === 'tool' ? (
+            <input
+              className="control-input control-input--compact"
+              placeholder="tool name"
+              value={message.name ?? ''}
+              onChange={(event) => onChange(message.id, { name: event.target.value })}
+            />
+          ) : null}
+        </div>
+        <div className="message-bubble__actions">
+          <button className="secondary-button icon-button" onClick={() => onMove(message.id, -1)} disabled={index === 0}>
             ↑
           </button>
-          <button
-            className="rounded-md border px-2 py-1 text-xs"
-            style={{ borderColor: 'var(--border)' }}
-            onClick={() => onMove(message.id, 1)}
-            disabled={index === count - 1}
-          >
+          <button className="secondary-button icon-button" onClick={() => onMove(message.id, 1)} disabled={index === count - 1}>
             ↓
           </button>
-          <button
-            className="rounded-md border px-2 py-1 text-xs"
-            style={{ borderColor: 'var(--border)' }}
-            onClick={() => onRemove(message.id)}
-          >
-            remove
+          <button className="ghost-button" onClick={() => onRemove(message.id)}>
+            Remove
           </button>
         </div>
       </div>
       <textarea
-        className="h-24 w-full rounded-md border p-2 text-sm"
-        style={{ borderColor: 'var(--border)', background: 'var(--bg-soft)' }}
+        className="bubble-editor"
         value={message.content}
+        placeholder={`Write the ${message.role} message...`}
         onChange={(event) => onChange(message.id, { content: event.target.value })}
       />
-    </div>
+    </article>
   );
 }
 
@@ -136,6 +155,7 @@ export default function App() {
   } = useAppStore();
 
   const [streamText, setStreamText] = useState('');
+  const [historyOpen, setHistoryOpen] = useState(true);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
@@ -181,7 +201,7 @@ export default function App() {
         }
         return true;
       })
-      .slice(0, 80);
+      .slice(0, 10);
   }, [modelSearch, models, request.provider]);
 
   const selectedModelInfo = useMemo(
@@ -212,6 +232,10 @@ export default function App() {
     return '';
   }, [response]);
 
+  const responseText = streamText || response?.extractedText || '';
+
+  const providerLabel = providerOptions.find((provider) => provider.id === request.provider)?.label ?? request.provider;
+
   const onSend = () => {
     setStreamText('');
     void send((text) => {
@@ -227,102 +251,193 @@ export default function App() {
   };
 
   const onCopyResponseText = async () => {
-    const text = streamText || response?.extractedText || '';
-    await navigator.clipboard.writeText(text);
+    await navigator.clipboard.writeText(responseText);
   };
 
   return (
-    <div className="mx-auto min-h-screen max-w-[1680px] px-3 py-4 md:px-4">
-      <header className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border p-3 panel">
-        <h1 className="text-lg font-semibold tracking-tight">API Pilot</h1>
-        <span className="text-sm" style={{ color: 'var(--muted)' }}>
-          LLM API testing tool
-        </span>
-        <div className="ml-auto flex gap-2">
-          <button
-            className="rounded-md border px-3 py-1 text-sm"
-            style={{ borderColor: 'var(--border)' }}
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          >
-            {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+    <div className="app-shell">
+      <header className="app-header">
+        <div className="brand-block">
+          <div className="brand-mark">AP</div>
+          <div>
+            <p className="eyebrow">LLM API testing tool</p>
+            <h1>API Pilot</h1>
+          </div>
+        </div>
+        <div className="header-actions">
+          <div className="header-status">
+            <span className="status-dot" />
+            <span>{providerLabel}</span>
+            <span className="status-separator">/</span>
+            <span className="mono-text">{request.model || 'Select a model'}</span>
+          </div>
+          <button className="secondary-button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+            {theme === 'dark' ? 'Light mode' : 'Dark mode'}
           </button>
-          <button
-            className="rounded-md border px-3 py-1 text-sm"
-            style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}
-            onClick={onSend}
-            disabled={isSending}
-          >
-            {isSending ? 'Sending...' : 'Send'}
+          <button className="primary-button" onClick={onSend} disabled={isSending}>
+            {isSending ? 'Sending…' : 'Send request'}
           </button>
         </div>
       </header>
 
-      <main className="grid gap-4 lg:grid-cols-2">
-        <section className="space-y-4">
-          <div className="panel rounded-xl p-3">
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <h2 className="font-medium">Request Builder</h2>
-              <label className="ml-auto flex items-center gap-2 text-xs" style={{ color: 'var(--muted)' }}>
-                <input
-                  type="checkbox"
-                  checked={showRawRequest}
-                  onChange={(event) => setShowRawRequest(event.target.checked)}
+      <main className="workspace-grid">
+        <section className="response-column">
+          <div className="surface surface--hero">
+            <div className="response-headline">
+              <div>
+                <p className="eyebrow">Response</p>
+                <h2>Inspect output first, then tune the request.</h2>
+              </div>
+              <div className="response-headline__actions">
+                <button className="secondary-button" onClick={() => void onCopyResponseText()} disabled={!responseText}>
+                  Copy text
+                </button>
+                <label className="toggle-row">
+                  <input
+                    type="checkbox"
+                    checked={showRawResponse}
+                    onChange={(event) => setShowRawResponse(event.target.checked)}
+                  />
+                  <span>Raw JSON</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="stats-grid">
+              <div className="stat-card">
+                <span className="stat-label">Status</span>
+                <strong>{response?.status ?? '—'}</strong>
+              </div>
+              <div className="stat-card">
+                <span className="stat-label">TTFT</span>
+                <strong>{formatMs(response?.ttftMs)}</strong>
+              </div>
+              <div className="stat-card">
+                <span className="stat-label">Total time</span>
+                <strong>{formatMs(response?.totalMs)}</strong>
+              </div>
+              <div className="stat-card">
+                <span className="stat-label">Estimated cost</span>
+                <strong>{formatCurrency(response?.costEstimateUsd)}</strong>
+              </div>
+            </div>
+
+            <div className="token-bar">
+              <span>Input {response?.usage.inputTokens ?? '—'}</span>
+              <span>Output {response?.usage.outputTokens ?? '—'}</span>
+              <span>Total {response?.usage.totalTokens ?? '—'}</span>
+            </div>
+
+            {response?.errorHint ? <div className="error-banner">{response.errorHint}</div> : null}
+
+            <article className="response-output">
+              {responseText ? <pre>{responseText}</pre> : <p className="empty-state">No response text yet. Send a request to see output here.</p>}
+            </article>
+
+            {showRawResponse ? (
+              <div className="code-panel">
+                <CodeMirror
+                  value={responseJson}
+                  editable={false}
+                  height="320px"
+                  extensions={[json()]}
+                  theme={theme === 'dark' ? 'dark' : 'light'}
                 />
-                Raw JSON
-              </label>
-              <button
-                className="rounded-md border px-2 py-1 text-xs"
-                style={{ borderColor: 'var(--border)' }}
-                onClick={onCopyCurl}
-              >
-                Copy as cURL
+              </div>
+            ) : null}
+
+            <details className="detail-panel">
+              <summary>Status code and headers</summary>
+              <pre>{JSON.stringify({ status: response?.status, headers: response?.headers ?? {} }, null, 2)}</pre>
+            </details>
+          </div>
+
+          <section className="surface">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">History</p>
+                <h3>Recent runs</h3>
+              </div>
+              <div className="section-heading__actions">
+                <button className="ghost-button" onClick={() => setHistoryOpen((open) => !open)}>
+                  {historyOpen ? 'Collapse' : 'Expand'}
+                </button>
+                <button className="ghost-button" onClick={clearHistory} disabled={history.length === 0}>
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            {historyOpen ? (
+              <div className="history-list">
+                {history.length === 0 ? <p className="empty-state">No saved requests yet.</p> : null}
+                {history.map((item) => (
+                  <article key={item.id} className="history-card">
+                    <div className="history-card__top">
+                      <div>
+                        <strong>{item.request.model}</strong>
+                        <p>{new Date(item.timestamp).toLocaleString()}</p>
+                      </div>
+                      <span className="status-pill">{item.response.status ?? 'error'}</span>
+                    </div>
+                    <p className="history-meta">
+                      {item.request.provider} · {item.requestPreview.url}
+                    </p>
+                    <div className="history-actions">
+                      <button className="secondary-button" onClick={() => replayHistory(item.id)}>
+                        Replay
+                      </button>
+                      <button className="ghost-button" onClick={() => deleteHistory(item.id)}>
+                        Delete
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : null}
+          </section>
+        </section>
+
+        <aside className="control-column">
+          <section className="surface">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Request setup</p>
+                <h3>Choose provider and model</h3>
+              </div>
+              <button className="ghost-button" onClick={() => void fetchModels(true)}>
+                Refresh models
               </button>
             </div>
 
-            <div className="grid gap-2 md:grid-cols-2">
-              <label className="space-y-1 text-sm">
-                <span style={{ color: 'var(--muted)' }}>Provider</span>
-                <select
-                  className="w-full rounded-md border px-2 py-2"
-                  style={{ borderColor: 'var(--border)', background: 'var(--bg-soft)' }}
-                  value={request.provider}
-                  onChange={(event) => setProvider(event.target.value as typeof request.provider)}
+            <div className="provider-pills" role="tablist" aria-label="Provider selection">
+              {providerOptions.map((provider) => (
+                <button
+                  key={provider.id}
+                  className={`provider-pill ${request.provider === provider.id ? 'is-active' : ''}`}
+                  onClick={() => setProvider(provider.id)}
                 >
-                  {providerOptions.map((provider) => (
-                    <option key={provider.id} value={provider.id}>
-                      {provider.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="space-y-1 text-sm">
-                <span style={{ color: 'var(--muted)' }}>API Key</span>
+                  {provider.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="field-grid">
+              <label className="field">
+                <span>API key</span>
                 <input
-                  className="w-full rounded-md border px-2 py-2"
-                  style={{ borderColor: 'var(--border)', background: 'var(--bg-soft)' }}
+                  className="control-input"
                   type="password"
                   placeholder="Stored in localStorage only"
                   value={request.apiKey}
                   onChange={(event) => setRequestField('apiKey', event.target.value)}
                 />
               </label>
-            </div>
 
-            <div className="mt-2 grid gap-2 md:grid-cols-2">
-              <label className="space-y-1 text-sm">
-                <span style={{ color: 'var(--muted)' }}>Model</span>
+              <label className="field">
+                <span>Base URL</span>
                 <input
-                  className="w-full rounded-md border px-2 py-2"
-                  style={{ borderColor: 'var(--border)', background: 'var(--bg-soft)' }}
-                  value={request.model}
-                  onChange={(event) => setRequestField('model', event.target.value)}
-                />
-              </label>
-              <label className="space-y-1 text-sm">
-                <span style={{ color: 'var(--muted)' }}>Base URL</span>
-                <input
-                  className="w-full rounded-md border px-2 py-2"
-                  style={{ borderColor: 'var(--border)', background: 'var(--bg-soft)' }}
+                  className="control-input mono-text"
                   value={request.baseUrl}
                   onChange={(event) => setRequestField('baseUrl', event.target.value)}
                   placeholder="Custom provider base URL"
@@ -330,22 +445,141 @@ export default function App() {
               </label>
             </div>
 
-            <label className="mt-2 block space-y-1 text-sm">
-              <span style={{ color: 'var(--muted)' }}>System Prompt</span>
+            <div className="model-search-panel">
+              <label className="field">
+                <span>Model search</span>
+                <input
+                  id="model-search-input"
+                  className="control-input"
+                  placeholder="Search models, providers, or IDs"
+                  value={modelSearch}
+                  onChange={(event) => setModelSearch(event.target.value)}
+                />
+              </label>
+
+              <label className="field">
+                <span>Selected model</span>
+                <input
+                  className="control-input mono-text"
+                  value={request.model}
+                  onChange={(event) => setRequestField('model', event.target.value)}
+                />
+              </label>
+
+              {modelsLoading ? <p className="helper-text">Loading models…</p> : null}
+              {modelsError ? <p className="error-text">{modelsError}</p> : null}
+
+              <div className="model-results" role="list">
+                {filteredModels.map((model) => (
+                  <button
+                    key={model.id}
+                    className={`model-option ${model.id === request.model ? 'is-active' : ''}`}
+                    onClick={() => setRequestField('model', model.id)}
+                  >
+                    <div className="model-option__top">
+                      <strong>{model.name}</strong>
+                      <span>{model.contextLength.toLocaleString()} ctx</span>
+                    </div>
+                    <p className="model-option__id">{model.id}</p>
+                    <div className="model-option__meta">
+                      <span>{model.provider}</span>
+                      <span>In ${(model.promptPricePerToken * 1_000_000).toFixed(2)}/1M</span>
+                      <span>Out ${(model.completionPricePerToken * 1_000_000).toFixed(2)}/1M</span>
+                    </div>
+                    <div className="badge-row">
+                      {capabilityBadges(model).map((badge) => (
+                        <span key={badge} className="mini-badge">
+                          {badge}
+                        </span>
+                      ))}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="selected-model-card">
+              <span className="eyebrow">Active model</span>
+              <strong>{selectedModelInfo ? selectedModelInfo.name : request.model || 'Not selected'}</strong>
+              <p>
+                {selectedModelInfo
+                  ? `${selectedModelInfo.provider} · ${selectedModelInfo.contextLength.toLocaleString()} token context`
+                  : 'Not in the OpenRouter index. You can still send to custom-compatible endpoints.'}
+              </p>
+            </div>
+          </section>
+
+          <section className="surface">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Prompting</p>
+                <h3>Compose the conversation</h3>
+              </div>
+              <button className="secondary-button" onClick={addMessage}>
+                Add message
+              </button>
+            </div>
+
+            <label className="field">
+              <span>System prompt</span>
               <textarea
-                className="h-20 w-full rounded-md border p-2"
-                style={{ borderColor: 'var(--border)', background: 'var(--bg-soft)' }}
+                className="control-input control-textarea"
                 value={request.systemPrompt}
                 onChange={(event) => setRequestField('systemPrompt', event.target.value)}
+                placeholder="Set behavior, constraints, or persona"
               />
             </label>
 
-            <div className="mt-3 grid gap-2 md:grid-cols-4">
-              <label className="space-y-1 text-sm">
-                <span style={{ color: 'var(--muted)' }}>Temperature</span>
+            <div className="template-strip" aria-label="Prompt templates">
+              {templates.map((template) => (
+                <button key={template.id} className="template-chip" onClick={() => applyTemplate(template.id)}>
+                  <span>{template.name}</span>
+                  <small>{template.description}</small>
+                </button>
+              ))}
+            </div>
+
+            <div className="message-list">
+              {request.messages.map((message, index) => (
+                <MessageBubble
+                  key={message.id}
+                  message={message}
+                  index={index}
+                  count={request.messages.length}
+                  onChange={updateMessage}
+                  onRemove={removeMessage}
+                  onMove={moveMessage}
+                />
+              ))}
+            </div>
+          </section>
+
+          <section className="surface">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Request tuning</p>
+                <h3>Parameters and payload</h3>
+              </div>
+              <div className="section-heading__actions">
+                <label className="toggle-row">
+                  <input
+                    type="checkbox"
+                    checked={showRawRequest}
+                    onChange={(event) => setShowRawRequest(event.target.checked)}
+                  />
+                  <span>Raw JSON</span>
+                </label>
+                <button className="ghost-button" onClick={() => void onCopyCurl()}>
+                  Copy as cURL
+                </button>
+              </div>
+            </div>
+
+            <div className="field-grid field-grid--metrics">
+              <label className="field">
+                <span>Temperature</span>
                 <input
-                  className="w-full rounded-md border px-2 py-2"
-                  style={{ borderColor: 'var(--border)', background: 'var(--bg-soft)' }}
+                  className="control-input"
                   type="number"
                   step="0.1"
                   min="0"
@@ -354,22 +588,20 @@ export default function App() {
                   onChange={(event) => setParamsField('temperature', Number(event.target.value))}
                 />
               </label>
-              <label className="space-y-1 text-sm">
-                <span style={{ color: 'var(--muted)' }}>max_tokens</span>
+              <label className="field">
+                <span>Max tokens</span>
                 <input
-                  className="w-full rounded-md border px-2 py-2"
-                  style={{ borderColor: 'var(--border)', background: 'var(--bg-soft)' }}
+                  className="control-input"
                   type="number"
                   min="1"
                   value={request.params.maxTokens}
                   onChange={(event) => setParamsField('maxTokens', Number(event.target.value))}
                 />
               </label>
-              <label className="space-y-1 text-sm">
-                <span style={{ color: 'var(--muted)' }}>top_p</span>
+              <label className="field">
+                <span>Top P</span>
                 <input
-                  className="w-full rounded-md border px-2 py-2"
-                  style={{ borderColor: 'var(--border)', background: 'var(--bg-soft)' }}
+                  className="control-input"
                   type="number"
                   step="0.1"
                   min="0"
@@ -378,257 +610,32 @@ export default function App() {
                   onChange={(event) => setParamsField('topP', Number(event.target.value))}
                 />
               </label>
-              <label className="flex items-end gap-2 text-sm pb-2">
+              <label className="toggle-card">
+                <span>
+                  <strong>Streaming</strong>
+                  <small>Receive tokens incrementally</small>
+                </span>
                 <input
                   type="checkbox"
                   checked={request.params.stream}
                   onChange={(event) => setParamsField('stream', event.target.checked)}
                 />
-                <span>stream</span>
               </label>
             </div>
 
             {showRawRequest ? (
-              <div className="mt-3 overflow-hidden rounded-md border" style={{ borderColor: 'var(--border)' }}>
+              <div className="code-panel">
                 <CodeMirror
                   value={requestPreviewJson}
                   editable={false}
-                  height="220px"
+                  height="280px"
                   extensions={[json()]}
                   theme={theme === 'dark' ? 'dark' : 'light'}
                 />
               </div>
             ) : null}
-          </div>
-
-          <div className="panel rounded-xl p-3">
-            <div className="mb-2 flex items-center gap-2">
-              <h2 className="font-medium">Model Selector</h2>
-              <button
-                className="ml-auto rounded-md border px-2 py-1 text-xs"
-                style={{ borderColor: 'var(--border)' }}
-                onClick={() => void fetchModels(true)}
-              >
-                Refresh
-              </button>
-            </div>
-            <input
-              id="model-search-input"
-              className="mb-2 w-full rounded-md border px-2 py-2 text-sm"
-              style={{ borderColor: 'var(--border)', background: 'var(--bg-soft)' }}
-              placeholder="Search OpenRouter models"
-              value={modelSearch}
-              onChange={(event) => setModelSearch(event.target.value)}
-            />
-            {modelsLoading ? <p className="text-sm">Loading models...</p> : null}
-            {modelsError ? (
-              <p className="text-sm" style={{ color: '#ff8a8a' }}>
-                {modelsError}
-              </p>
-            ) : null}
-            <div className="max-h-72 space-y-2 overflow-auto pr-1">
-              {filteredModels.map((model) => (
-                <button
-                  key={model.id}
-                  className="panel block w-full rounded-md p-2 text-left transition-all duration-200 hover:border-sky-400"
-                  style={{
-                    borderColor: model.id === request.model ? 'var(--accent)' : 'var(--border)',
-                    background: model.id === request.model ? 'color-mix(in srgb, var(--accent) 10%, var(--panel))' : undefined,
-                  }}
-                  onClick={() => setRequestField('model', model.id)}
-                >
-                  <div className="text-sm font-medium">{model.name}</div>
-                  <div className="text-xs" style={{ color: 'var(--muted)' }}>
-                    {model.id} · {model.provider} · {model.contextLength.toLocaleString()} ctx
-                  </div>
-                  <div className="mt-1 flex flex-wrap gap-1 text-[10px]">
-                    <span className="rounded border px-1" style={{ borderColor: 'var(--border)' }}>
-                      in ${(model.promptPricePerToken * 1_000_000).toFixed(2)}/1M
-                    </span>
-                    <span className="rounded border px-1" style={{ borderColor: 'var(--border)' }}>
-                      out ${(model.completionPricePerToken * 1_000_000).toFixed(2)}/1M
-                    </span>
-                    {capabilityBadges(model).map((badge) => (
-                      <span key={badge} className="rounded border px-1" style={{ borderColor: 'var(--border)' }}>
-                        {badge}
-                      </span>
-                    ))}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="panel rounded-xl p-3">
-            <div className="mb-2 flex items-center gap-2">
-              <h2 className="font-medium">Messages</h2>
-              <button
-                className="ml-auto rounded-md border px-2 py-1 text-xs"
-                style={{ borderColor: 'var(--border)' }}
-                onClick={addMessage}
-              >
-                Add Message
-              </button>
-            </div>
-            <div className="space-y-2">
-              {request.messages.map((message, idx) => (
-                <MessageRow
-                  key={message.id}
-                  message={message}
-                  index={idx}
-                  count={request.messages.length}
-                  onChange={updateMessage}
-                  onRemove={removeMessage}
-                  onMove={moveMessage}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="panel rounded-xl p-3">
-            <h2 className="mb-2 font-medium">Templates</h2>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {templates.map((template) => (
-                <button
-                  key={template.id}
-                  className="rounded-md border p-2 text-left text-sm transition-all duration-200 hover:border-sky-400"
-                  style={{ borderColor: 'var(--border)' }}
-                  onClick={() => applyTemplate(template.id)}
-                >
-                  <div className="font-medium">{template.name}</div>
-                  <div style={{ color: 'var(--muted)' }}>{template.description}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <div className="panel rounded-xl p-3">
-            <div className="mb-2 flex items-center gap-2">
-              <h2 className="font-medium">Response Viewer</h2>
-              <label className="ml-auto flex items-center gap-2 text-xs" style={{ color: 'var(--muted)' }}>
-                <input
-                  type="checkbox"
-                  checked={showRawResponse}
-                  onChange={(event) => setShowRawResponse(event.target.checked)}
-                />
-                Raw JSON
-              </label>
-              <button
-                className="rounded-md border px-2 py-1 text-xs"
-                style={{ borderColor: 'var(--border)' }}
-                onClick={() => void onCopyResponseText()}
-              >
-                Copy Text
-              </button>
-            </div>
-
-            <div className="mb-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-md border p-2 text-xs" style={{ borderColor: 'var(--border)' }}>
-                Status: {response?.status ?? '—'}
-              </div>
-              <div className="rounded-md border p-2 text-xs" style={{ borderColor: 'var(--border)' }}>
-                TTFT: {formatMs(response?.ttftMs)}
-              </div>
-              <div className="rounded-md border p-2 text-xs" style={{ borderColor: 'var(--border)' }}>
-                Total: {formatMs(response?.totalMs)}
-              </div>
-              <div className="rounded-md border p-2 text-xs" style={{ borderColor: 'var(--border)' }}>
-                Cost: {formatCurrency(response?.costEstimateUsd)}
-              </div>
-            </div>
-
-            <div className="rounded-md border p-2 text-xs" style={{ borderColor: 'var(--border)' }}>
-              Tokens: in {response?.usage.inputTokens ?? '—'} | out {response?.usage.outputTokens ?? '—'} | total{' '}
-              {response?.usage.totalTokens ?? '—'}
-            </div>
-
-            {response?.errorHint ? (
-              <div className="mt-2 rounded-md border p-2 text-sm" style={{ borderColor: '#ff8a8a', color: '#ffb4b4' }}>
-                {response.errorHint}
-              </div>
-            ) : null}
-
-            <div className="mt-3 rounded-md border p-3 text-sm leading-relaxed" style={{ borderColor: 'var(--border)' }}>
-              {streamText || response?.extractedText || 'No response text yet.'}
-            </div>
-
-            {showRawResponse ? (
-              <div className="mt-3 overflow-hidden rounded-md border" style={{ borderColor: 'var(--border)' }}>
-                <CodeMirror
-                  value={responseJson}
-                  editable={false}
-                  height="300px"
-                  extensions={[json()]}
-                  theme={theme === 'dark' ? 'dark' : 'light'}
-                />
-              </div>
-            ) : null}
-
-            <details className="mt-3 rounded-md border p-2 text-sm" style={{ borderColor: 'var(--border)' }}>
-              <summary className="cursor-pointer">Status code + headers</summary>
-              <pre className="mt-2 overflow-auto text-xs">
-                {JSON.stringify({ status: response?.status, headers: response?.headers ?? {} }, null, 2)}
-              </pre>
-            </details>
-          </div>
-
-          <div className="panel rounded-xl p-3">
-            <div className="mb-2 flex items-center gap-2">
-              <h2 className="font-medium">History</h2>
-              <button
-                className="ml-auto rounded-md border px-2 py-1 text-xs"
-                style={{ borderColor: 'var(--border)' }}
-                onClick={clearHistory}
-                disabled={history.length === 0}
-              >
-                Clear
-              </button>
-            </div>
-            <div className="max-h-[40rem] space-y-2 overflow-auto pr-1">
-              {history.length === 0 ? (
-                <p className="text-sm" style={{ color: 'var(--muted)' }}>
-                  No saved requests yet.
-                </p>
-              ) : null}
-              {history.map((item) => (
-                <div key={item.id} className="rounded-md border p-2 text-sm" style={{ borderColor: 'var(--border)' }}>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">{item.request.model}</span>
-                    <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                      {new Date(item.timestamp).toLocaleString()}
-                    </span>
-                    <span className="ml-auto text-xs">{item.response.status ?? 'error'}</span>
-                  </div>
-                  <div className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>
-                    {item.request.provider} · {item.requestPreview.url}
-                  </div>
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      className="rounded-md border px-2 py-1 text-xs"
-                      style={{ borderColor: 'var(--border)' }}
-                      onClick={() => replayHistory(item.id)}
-                    >
-                      Replay
-                    </button>
-                    <button
-                      className="rounded-md border px-2 py-1 text-xs"
-                      style={{ borderColor: 'var(--border)' }}
-                      onClick={() => deleteHistory(item.id)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="panel rounded-xl p-3 text-xs" style={{ color: 'var(--muted)' }}>
-            Selected model metadata: {selectedModelInfo ? `${selectedModelInfo.name} (${selectedModelInfo.provider})` : 'Not in OpenRouter index'}
-          </div>
-        </section>
+          </section>
+        </aside>
       </main>
     </div>
   );
