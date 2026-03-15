@@ -107,6 +107,7 @@ export function buildRequestPreview(config: RequestConfig): RequestPreview {
     case 'openai-chat':
     case 'custom': {
       const base = config.provider === 'custom' ? baseUrl || 'http://localhost:11434/v1' : OPENAI_BASE;
+      const path = config.provider === 'custom' ? '/chat/completions' : '/v1/chat/completions';
       const body: Record<string, unknown> = {
         model,
         messages: toOpenAiMessages(config.systemPrompt, config.messages),
@@ -118,7 +119,7 @@ export function buildRequestPreview(config: RequestConfig): RequestPreview {
 
       return {
         method: 'POST',
-        url: joinUrl(base, '/v1/chat/completions'),
+        url: joinUrl(base, path),
         headers: {
           'content-type': 'application/json',
           authorization: `Bearer ${config.apiKey.trim()}`,
