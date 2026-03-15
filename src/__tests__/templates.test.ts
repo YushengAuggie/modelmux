@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { templates } from '../templates';
+import { templates } from '@/templates';
 
 const validProviders = new Set([
   'openai-chat',

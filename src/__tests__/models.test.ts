@@ -3,7 +3,7 @@ import {
   fetchOpenRouterModels,
   isModelsCacheFresh,
   loadCachedModels,
-} from '../models';
+} from '@/models';
 
 describe('models', () => {
   beforeEach(() => {

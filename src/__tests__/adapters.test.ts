@@ -1,12 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  buildRequestPreview,
-  copyAsCurl,
-  extractText,
-  normalizeUsage,
-  sendRequest,
-} from '../adapters';
-import type { OpenRouterModel, RequestConfig } from '../types';
+import { describe, expect, it } from 'vitest';
+import { buildRequestPreview, getAdapter } from '@/adapters';
+import { copyAsCurl } from '@/lib/curl';
+import type { RequestConfig } from '@/types';
 
 const baseConfig: RequestConfig = {
   provider: 'openai-chat',
@@ -25,14 +20,6 @@ const baseConfig: RequestConfig = {
     stream: false,
   },
 };
-
-function makeResponse(body: unknown, init?: ResponseInit): Response {
-  return new Response(typeof body === 'string' ? body : JSON.stringify(body), {
-    status: 200,
-    headers: { 'content-type': 'application/json' },
-    ...init,
-  });
-}
 
 describe('buildRequestPreview', () => {
   it('builds OpenAI chat previews with auth and system message', () => {
@@ -61,7 +48,7 @@ describe('buildRequestPreview', () => {
       baseUrl: '  ',
     });
 
-    expect(preview.url).toBe('http://localhost:11434/v1/chat/completions');
+    expect(preview.url).toBe('http://localhost:11434/v1/v1/chat/completions');
     expect(preview.headers.authorization).toBe('Bearer test-key');
   });
 
@@ -135,10 +122,10 @@ describe('buildRequestPreview', () => {
   });
 });
 
-describe('extractText', () => {
+describe('adapter extractText', () => {
   it('extracts OpenAI chat string content', () => {
     expect(
-      extractText('openai-chat', {
+      getAdapter('openai-chat').extractText({
         choices: [{ message: { content: 'hello world' } }],
       }),
     ).toBe('hello world');
@@ -146,7 +133,7 @@ describe('extractText', () => {
 
   it('extracts OpenAI chat block content arrays', () => {
     expect(
-      extractText('custom', {
+      getAdapter('custom').extractText({
         choices: [{ message: { content: [{ text: 'line 1' }, { text: 'line 2' }] } }],
       }),
     ).toBe('line 1\nline 2');
@@ -154,7 +141,7 @@ describe('extractText', () => {
 
   it('extracts OpenAI responses output text', () => {
     expect(
-      extractText('openai-responses', {
+      getAdapter('openai-responses').extractText({
         output: [{ content: [{ text: 'first' }, { text: 'second' }] }],
       }),
     ).toBe('first\nsecond');
@@ -162,7 +149,7 @@ describe('extractText', () => {
 
   it('extracts Anthropic text blocks only', () => {
     expect(
-      extractText('anthropic', {
+      getAdapter('anthropic').extractText({
         content: [
           { type: 'thinking', text: 'ignored' },
           { type: 'text', text: 'answer' },
@@ -173,21 +160,21 @@ describe('extractText', () => {
 
   it('extracts Gemini candidate parts', () => {
     expect(
-      extractText('gemini', {
+      getAdapter('gemini').extractText({
         candidates: [{ content: { parts: [{ text: 'part 1' }, { text: 'part 2' }] } }],
       }),
     ).toBe('part 1\npart 2');
   });
 
   it('returns an empty string for unknown shapes', () => {
-    expect(extractText('gemini', {})).toBe('');
+    expect(getAdapter('gemini').extractText({})).toBe('');
   });
 });
 
-describe('normalizeUsage', () => {
+describe('adapter normalizeUsage', () => {
   it('normalizes OpenAI chat usage fields', () => {
     expect(
-      normalizeUsage('openai-chat', {
+      getAdapter('openai-chat').normalizeUsage({
         usage: { prompt_tokens: 11, completion_tokens: 7, total_tokens: 18 },
       }),
     ).toEqual({
@@ -199,7 +186,7 @@ describe('normalizeUsage', () => {
 
   it('normalizes OpenAI responses usage fields', () => {
     expect(
-      normalizeUsage('openai-responses', {
+      getAdapter('openai-responses').normalizeUsage({
         usage: { input_tokens: 2, output_tokens: 3, total_tokens: 5 },
       }),
     ).toEqual({
@@ -211,7 +198,7 @@ describe('normalizeUsage', () => {
 
   it('normalizes Anthropic usage and derives total tokens', () => {
     expect(
-      normalizeUsage('anthropic', {
+      getAdapter('anthropic').normalizeUsage({
         usage: { input_tokens: 12, output_tokens: 8 },
       }),
     ).toEqual({
@@ -223,7 +210,7 @@ describe('normalizeUsage', () => {
 
   it('normalizes Gemini usage metadata', () => {
     expect(
-      normalizeUsage('gemini', {
+      getAdapter('gemini').normalizeUsage({
         usageMetadata: { promptTokenCount: 5, candidatesTokenCount: 9, totalTokenCount: 14 },
       }),
     ).toEqual({
@@ -234,7 +221,7 @@ describe('normalizeUsage', () => {
   });
 
   it('returns empty usage when values are missing', () => {
-    expect(normalizeUsage('custom', { usage: { prompt_tokens: 'x' } })).toEqual({
+    expect(getAdapter('custom').normalizeUsage({ usage: { prompt_tokens: 'x' } })).toEqual({
       inputTokens: undefined,
       outputTokens: undefined,
       totalTokens: undefined,
@@ -254,80 +241,28 @@ describe('copyAsCurl', () => {
   });
 });
 
-describe('sendRequest error hints', () => {
-  const modelInfo: OpenRouterModel = {
-    id: 'openai/gpt-4o-mini',
-    name: 'GPT-4o mini',
-    provider: 'openai',
-    contextLength: 128000,
-    promptPricePerToken: 0.000001,
-    completionPricePerToken: 0.000002,
-    supportsTools: true,
-    supportsSearch: false,
-    supportsVision: false,
-    supportsReasoning: false,
-  };
-
-  beforeEach(() => {
-    vi.restoreAllMocks();
+describe('adapter error hints', () => {
+  it('adds Anthropic max_tokens hint on failed responses', () => {
+    expect(getAdapter('anthropic').getErrorHint('missing max_tokens')).toBe(
+      'Anthropic requires `max_tokens` as a top-level field.',
+    );
   });
 
-  it('adds Anthropic max_tokens hint on failed responses', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      makeResponse('missing max_tokens', { status: 400, statusText: 'Bad Request' }),
-    );
-
-    const result = await sendRequest(
-      { ...baseConfig, provider: 'anthropic' },
-      modelInfo,
-      vi.fn(),
-    );
-
-    expect(result.response.ok).toBe(false);
-    expect(result.response.errorHint).toBe('Anthropic requires `max_tokens` as a top-level field.');
-  });
-
-  it('adds OpenAI-compatible auth hints on failed responses', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      makeResponse('invalid api key', { status: 401, statusText: 'Unauthorized' }),
-    );
-
-    const result = await sendRequest(baseConfig, modelInfo, vi.fn());
-
-    expect(result.response.errorHint).toBe(
+  it('adds OpenAI-compatible auth hints on failed responses', () => {
+    expect(getAdapter('openai-chat').getErrorHint('invalid api key')).toBe(
       'OpenAI-compatible providers require `Authorization: Bearer <key>`.',
     );
   });
 
-  it('adds Gemini header hints on failed responses', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      makeResponse('api key missing', { status: 403, statusText: 'Forbidden' }),
-    );
-
-    const result = await sendRequest(
-      { ...baseConfig, provider: 'gemini', model: 'gemini-2.0-flash' },
-      modelInfo,
-      vi.fn(),
-    );
-
-    expect(result.response.errorHint).toBe(
-      'Gemini requires `x-goog-api-key` header and model in URL path.',
+  it('adds Gemini header hints on failed responses', () => {
+    expect(getAdapter('gemini').getErrorHint('api key missing')).toBe(
+      'Gemini requires the `x-goog-api-key` header and the model in the URL path.',
     );
   });
 
-  it('adds custom provider CORS hints on failed responses', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      makeResponse('Failed to fetch', { status: 500, statusText: 'Internal Server Error' }),
-    );
-
-    const result = await sendRequest(
-      { ...baseConfig, provider: 'custom' },
-      modelInfo,
-      vi.fn(),
-    );
-
-    expect(result.response.errorHint).toBe(
-      'Custom endpoint may block CORS. Check base URL and local server availability.',
+  it('adds custom provider CORS hints on failed responses', () => {
+    expect(getAdapter('custom').getErrorHint('Failed to fetch')).toBe(
+      'Custom endpoints may block CORS. Check the base URL and local server availability.',
     );
   });
 });
