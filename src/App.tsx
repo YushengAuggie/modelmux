@@ -10,7 +10,7 @@ import type { MessageItem, OpenRouterModel, ProviderId } from '@/types';
 
 function formatCurrency(value?: number): string {
   if (value === undefined) {
-    return '—';
+    return 'Pending';
   }
   if (value === 0) {
     return '$0.00';
@@ -19,7 +19,7 @@ function formatCurrency(value?: number): string {
 }
 
 function formatMs(value?: number): string {
-  return value !== undefined ? `${Math.round(value)} ms` : '—';
+  return value !== undefined ? `${Math.round(value)} ms` : 'Pending';
 }
 
 function capabilityBadges(model: OpenRouterModel): string[] {
@@ -47,21 +47,6 @@ function providerTone(provider: ProviderId): string {
   }
 }
 
-function messageTitle(role: MessageItem['role']): string {
-  switch (role) {
-    case 'system':
-      return 'System';
-    case 'user':
-      return 'User';
-    case 'assistant':
-      return 'Assistant';
-    case 'tool':
-      return 'Tool';
-    default:
-      return role;
-  }
-}
-
 function MessageBubble({
   message,
   index,
@@ -81,9 +66,8 @@ function MessageBubble({
     <article className={`message-bubble ${providerTone(message.role === 'assistant' ? 'anthropic' : message.role === 'tool' ? 'gemini' : message.role === 'system' ? 'custom' : 'openai-chat')}`}>
       <div className="message-bubble__header">
         <div className="message-bubble__meta">
-          <span className="role-badge">{messageTitle(message.role)}</span>
           <select
-            className="control-input control-input--compact"
+            className="control-input control-input--compact role-select"
             aria-label={`Message ${index + 1} role`}
             value={message.role}
             onChange={(event) => onChange(message.id, { role: event.target.value as MessageItem['role'] })}
@@ -109,7 +93,7 @@ function MessageBubble({
           <button className="secondary-button icon-button" onClick={() => onMove(message.id, 1)} disabled={index === count - 1}>
             ↓
           </button>
-          <button className="ghost-button" onClick={() => onRemove(message.id)}>
+          <button className="ghost-button action-button" onClick={() => onRemove(message.id)}>
             Remove
           </button>
         </div>
@@ -203,7 +187,7 @@ export default function App() {
         }
         return true;
       })
-      .slice(0, 10);
+      .slice(0, 5);
   }, [modelSearch, models, request.provider]);
 
   const selectedModelInfo = useMemo(
@@ -272,7 +256,7 @@ export default function App() {
           <button className="secondary-button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
             {theme === 'dark' ? 'Light mode' : 'Dark mode'}
           </button>
-          <button className="primary-button" onClick={onSend} disabled={isSending}>
+          <button className="primary-button primary-button--hero" onClick={onSend} disabled={isSending}>
             {isSending ? 'Sending…' : 'Send request'}
           </button>
         </div>
@@ -310,7 +294,7 @@ export default function App() {
             <div className="stats-grid">
               <div className="stat-card">
                 <span className="stat-label">Status</span>
-                <strong>{response?.status ?? '—'}</strong>
+                <strong>{response?.status ?? 'Not run yet'}</strong>
               </div>
               <div className="stat-card">
                 <span className="stat-label">TTFT</span>
@@ -327,9 +311,9 @@ export default function App() {
             </div>
 
             <div className="token-bar">
-              <span>Input {response?.usage.inputTokens ?? '—'}</span>
-              <span>Output {response?.usage.outputTokens ?? '—'}</span>
-              <span>Total {response?.usage.totalTokens ?? '—'}</span>
+              <span>Input {response?.usage.inputTokens ?? 'Pending'}</span>
+              <span>Output {response?.usage.outputTokens ?? 'Pending'}</span>
+              <span>Total {response?.usage.totalTokens ?? 'Pending'}</span>
             </div>
 
             {response?.errorHint ? <div className="error-banner">{response.errorHint}</div> : null}
@@ -339,12 +323,13 @@ export default function App() {
                 <pre>{responseText}</pre>
               ) : (
                 <div className="empty-state">
-                  <p className="empty-state__title">{isSending ? 'Waiting for the first tokens…' : 'No response yet'}</p>
+                  <p className="empty-state__title">{isSending ? 'Waiting for the first tokens…' : 'Pick a template or build a request, then hit Send'}</p>
                   <p className="empty-state__body">
                     {isSending
                       ? 'The model is processing your request. Streaming text will appear here as soon as it arrives.'
-                      : 'Send a request to see output, timing, and token usage in one place.'}
+                      : 'The response pane stays open here so you can compare output, timing, and token usage without digging through controls.'}
                   </p>
+                  {!isSending ? <p className="empty-state__hint">Use the Send button in the header above and to the right ↗</p> : null}
                 </div>
               )}
             </article>
@@ -385,7 +370,7 @@ export default function App() {
 
             {historyOpen ? (
               <div className="history-list">
-                {history.length === 0 ? <p className="empty-state">No saved requests yet.</p> : null}
+                {history.length === 0 ? <p className="empty-state empty-state--compact">Your requests will appear here.</p> : null}
                 {history.map((item) => (
                   <article key={item.id} className="history-card">
                     <div className="history-card__top">
@@ -414,35 +399,27 @@ export default function App() {
         </section>
 
         <aside className="control-column">
-          <section className="surface surface--action">
-            <div className="send-panel">
-              <div>
-                <p className="eyebrow">Send</p>
-                <h3>Run the current request</h3>
-                <p className="send-panel__meta">
-                  {request.model ? request.model : 'Choose a model, then send'} · {isSending ? 'Request in progress' : 'Ready'}
-                </p>
-              </div>
-              <div className="send-panel__actions">
-                <span className="shortcut-hint">Cmd/Ctrl + Enter</span>
-                <button className="primary-button primary-button--hero" onClick={onSend} disabled={isSending}>
-                  {isSending ? 'Sending…' : 'Send request'}
-                </button>
-              </div>
-            </div>
-          </section>
-
-          <section className="surface">
-            <div className="section-heading">
+          <details className="surface accordion-section" open>
+            <summary className="accordion-summary">
               <div>
                 <p className="eyebrow">Request setup</p>
-                <h3>Choose provider and model</h3>
+                <h3>Provider &amp; Model</h3>
                 <p className="section-intro">Pick the target model quickly, then refine the prompt and payload below.</p>
               </div>
-              <button className="ghost-button" onClick={() => void fetchModels(true)}>
-                Refresh models
-              </button>
-            </div>
+              <div className="accordion-summary__actions">
+                <span className="shortcut-hint">Cmd/Ctrl + K</span>
+                <button
+                  type="button"
+                  className="ghost-button"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void fetchModels(true);
+                  }}
+                >
+                  Refresh models
+                </button>
+              </div>
+            </summary>
 
             <div className="provider-pills" role="tablist" aria-label="Provider selection">
               {providerOptions.map((provider) => (
@@ -504,35 +481,40 @@ export default function App() {
               {modelsError ? <p className="error-text">{modelsError}</p> : null}
 
               <div className="model-results" role="list">
-                {filteredModels.map((model) => (
-                  <button
-                    key={model.id}
-                    className={`model-option ${model.id === request.model ? 'is-active' : ''}`}
-                    onClick={() => setRequestField('model', model.id)}
-                  >
-                    <div className="model-option__top">
-                      <strong>{model.name}</strong>
-                      <span>{model.contextLength.toLocaleString()} ctx</span>
-                    </div>
-                    <p className="model-option__id">{model.id}</p>
-                    <div className="model-option__meta">
-                      <span>{model.provider}</span>
-                      <span>In ${(model.promptPricePerToken * 1_000_000).toFixed(2)}/1M</span>
-                      <span>Out ${(model.completionPricePerToken * 1_000_000).toFixed(2)}/1M</span>
-                    </div>
-                    <div className="badge-row">
-                      {capabilityBadges(model).map((badge) => (
-                        <span key={badge} className="mini-badge">
-                          {badge}
-                        </span>
-                      ))}
-                    </div>
-                  </button>
-                ))}
+                {filteredModels.length > 0 ? (
+                  filteredModels.map((model) => (
+                    <button
+                      key={model.id}
+                      className={`model-option ${model.id === request.model ? 'is-active' : ''}`}
+                      onClick={() => setRequestField('model', model.id)}
+                    >
+                      <div className="model-option__row">
+                        <div className="model-option__identity">
+                          <strong>{model.name}</strong>
+                          <p className="model-option__id">{model.id}</p>
+                        </div>
+                        <div className="model-option__metrics">
+                          <span>{model.contextLength.toLocaleString()} ctx</span>
+                          <span>In ${(model.promptPricePerToken * 1_000_000).toFixed(2)}/1M</span>
+                          <span>Out ${(model.completionPricePerToken * 1_000_000).toFixed(2)}/1M</span>
+                        </div>
+                      </div>
+                      <div className="model-option__meta">
+                        <span>{model.provider}</span>
+                        <div className="badge-row">
+                          {capabilityBadges(model).map((badge) => (
+                            <span key={badge} className="mini-badge">
+                              {badge}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <p className="empty-state empty-state--compact">Type to search 300+ models.</p>
+                )}
               </div>
-              {!modelsLoading && filteredModels.length === 0 ? (
-                <p className="empty-state empty-state--compact">No models match this search for the current provider.</p>
-              ) : null}
             </div>
 
             <div className="selected-model-card">
@@ -544,19 +526,26 @@ export default function App() {
                   : 'Not in the OpenRouter index. You can still send to custom-compatible endpoints.'}
               </p>
             </div>
-          </section>
+          </details>
 
-          <section className="surface">
-            <div className="section-heading">
+          <details className="surface accordion-section" open>
+            <summary className="accordion-summary">
               <div>
                 <p className="eyebrow">Prompting</p>
-                <h3>Compose the conversation</h3>
+                <h3>Messages</h3>
                 <p className="section-intro">Messages use the same card structure across roles to keep edits predictable.</p>
               </div>
-              <button className="secondary-button" onClick={addMessage}>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  addMessage();
+                }}
+              >
                 Add message
               </button>
-            </div>
+            </summary>
 
             <label className="field">
               <span>System prompt</span>
@@ -590,16 +579,19 @@ export default function App() {
                 />
               ))}
             </div>
-          </section>
+          </details>
 
-          <section className="surface">
-            <div className="section-heading">
+          <details className="surface accordion-section" open>
+            <summary className="accordion-summary">
               <div>
                 <p className="eyebrow">Request tuning</p>
-                <h3>Parameters and payload</h3>
+                <h3>Parameters</h3>
               </div>
-              <div className="section-heading__actions">
-                <label className="toggle-row">
+              <div className="accordion-summary__actions">
+                <label
+                  className="toggle-row"
+                  onClick={(event) => event.preventDefault()}
+                >
                   <input
                     type="checkbox"
                     checked={showRawRequest}
@@ -607,11 +599,18 @@ export default function App() {
                   />
                   <span>Raw JSON</span>
                 </label>
-                <button className="ghost-button" onClick={() => void onCopyCurl()}>
+                <button
+                  type="button"
+                  className="ghost-button"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void onCopyCurl();
+                  }}
+                >
                   Copy as cURL
                 </button>
               </div>
-            </div>
+            </summary>
 
             <div className="field-grid field-grid--metrics">
               <label className="field">
@@ -672,7 +671,7 @@ export default function App() {
                 />
               </div>
             ) : null}
-          </section>
+          </details>
         </aside>
       </main>
     </div>
