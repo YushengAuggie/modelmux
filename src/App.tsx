@@ -8,6 +8,8 @@ import { useAppStore } from '@/store';
 import { useSendRequest } from '@/hooks/useSendRequest';
 import type { MessageItem, OpenRouterModel, ProviderId } from '@/types';
 
+const MOBILE_BREAKPOINT = 767;
+
 type StatusTone = 'idle' | 'success' | 'warning' | 'error';
 
 function getStatusTone(status?: number): StatusTone {
@@ -169,6 +171,27 @@ function providerTone(provider: ProviderId): string {
   }
 }
 
+function getProviderLabel(provider: ProviderId, compact: boolean): string {
+  if (!compact) {
+    return providerOptions.find((option) => option.id === provider)?.label ?? provider;
+  }
+
+  switch (provider) {
+    case 'openai-chat':
+      return 'OpenAI CC';
+    case 'openai-responses':
+      return 'OpenAI Resp';
+    case 'anthropic':
+      return 'Anthropic';
+    case 'gemini':
+      return 'Gemini';
+    case 'custom':
+      return 'Custom';
+    default:
+      return provider;
+  }
+}
+
 function MessageBubble({
   message,
   index,
@@ -262,7 +285,17 @@ export default function App() {
   } = useAppStore();
 
   const { streamText, send, copyRequestCurl, copyResponseText, clearStreamText } = useSendRequest();
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth <= MOBILE_BREAKPOINT;
+  });
   const [historyOpen, setHistoryOpen] = useState(true);
+  const [showAllModels, setShowAllModels] = useState(false);
+  const [accordionOpen, setAccordionOpen] = useState({
+    provider: true,
+    messages: false,
+    parameters: false,
+  });
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
@@ -274,6 +307,25 @@ export default function App() {
   useEffect(() => {
     void fetchModels(false);
   }, [fetchModels]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`);
+    const updateIsMobile = (event?: MediaQueryListEvent) => {
+      setIsMobile(event ? event.matches : mediaQuery.matches);
+    };
+
+    updateIsMobile();
+    mediaQuery.addEventListener('change', updateIsMobile);
+    return () => mediaQuery.removeEventListener('change', updateIsMobile);
+  }, []);
+
+  useEffect(() => {
+    setAccordionOpen(
+      isMobile
+        ? { provider: true, messages: false, parameters: false }
+        : { provider: true, messages: true, parameters: true },
+    );
+  }, [isMobile]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -308,9 +360,12 @@ export default function App() {
           return model.provider.includes('openai') || model.id.startsWith('openai/');
         }
         return true;
-      })
-      .slice(0, 5);
+      });
   }, [modelSearch, models, request.provider]);
+
+  useEffect(() => {
+    setShowAllModels(false);
+  }, [isMobile, modelSearch, request.provider]);
 
   const selectedModelInfo = useMemo(
     () => models.find((model) => model.id === request.model),
@@ -359,7 +414,9 @@ export default function App() {
     [request],
   );
 
-  const providerLabel = providerOptions.find((provider) => provider.id === request.provider)?.label ?? request.provider;
+  const providerLabel = getProviderLabel(request.provider, false);
+  const visibleModels = isMobile && !showAllModels ? filteredModels.slice(0, 3) : filteredModels.slice(0, 5);
+  const hasMoreModels = isMobile && filteredModels.length > 3 && !showAllModels;
 
   const onSend = () => {
     clearStreamText();
@@ -374,6 +431,10 @@ export default function App() {
     await copyResponseText();
   };
 
+  const toggleAccordionSection = (section: keyof typeof accordionOpen) => {
+    setAccordionOpen((current) => ({ ...current, [section]: !current[section] }));
+  };
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -385,16 +446,28 @@ export default function App() {
           </div>
         </div>
         <div className="header-actions">
-          <div className="header-status">
+          <div
+            className="header-status"
+            title={`${providerLabel} / ${request.model || 'Select a model'}`}
+          >
             <span className="status-dot" />
-            <span>{providerLabel}</span>
+            <span className="header-status__label">{providerLabel}</span>
             <span className="status-separator">/</span>
-            <span className="mono-text">{request.model || 'Select a model'}</span>
+            <span className="mono-text header-status__value">{request.model || 'Select a model'}</span>
           </div>
-          <button className="secondary-button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-            {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+          <button
+            className="secondary-button theme-toggle-button"
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          >
+            <span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span>
+            <span className="theme-toggle-button__label">{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
           </button>
-          <button className="primary-button primary-button--hero" onClick={onSend} disabled={isSending}>
+          <button
+            className="primary-button primary-button--hero header-send-button"
+            onClick={onSend}
+            disabled={isSending}
+          >
             {isSending ? (
               <>
                 <span className="primary-button__spinner" aria-hidden="true" />
@@ -490,7 +563,11 @@ export default function App() {
                       <span />
                     </div>
                   ) : null}
-                  {!isSending ? <p className="empty-state__hint">Use the Send button in the header above and to the right ↗</p> : null}
+                  {!isSending ? (
+                    <p className="empty-state__hint">
+                      {isMobile ? 'Use the Send button pinned at the bottom of the screen.' : 'Use the Send button in the header above and to the right ↗'}
+                    </p>
+                  ) : null}
                 </div>
               )}
             </article>
@@ -535,14 +612,17 @@ export default function App() {
                 {history.map((item) => (
                   <article key={item.id} className="history-card">
                     <div className="history-card__top">
-                      <div>
-                        <strong className="history-card__identity">
-                          {providerOptions.find((provider) => provider.id === item.request.provider)?.label ?? item.request.provider}
-                          {' · '}
-                          {item.request.model}
-                        </strong>
-                        <p>{new Date(item.timestamp).toLocaleString()}</p>
-                      </div>
+                      <strong
+                        className="history-card__identity"
+                        title={`${providerOptions.find((provider) => provider.id === item.request.provider)?.label ?? item.request.provider} · ${item.request.model}`}
+                      >
+                        {providerOptions.find((provider) => provider.id === item.request.provider)?.label ?? item.request.provider}
+                        {' · '}
+                        {item.request.model}
+                      </strong>
+                    </div>
+                    <div className="history-card__subhead">
+                      <p>{new Date(item.timestamp).toLocaleString()}</p>
                       <span className={`status-pill tone-${getStatusTone(item.response.status)}`}>
                         <span className="status-indicator" aria-hidden="true" />
                         <span>{item.response.status ?? 'error'}</span>
@@ -569,8 +649,14 @@ export default function App() {
         </section>
 
         <aside className="control-column">
-          <details className="surface accordion-section" open>
-            <summary className="accordion-summary">
+          <details className="surface accordion-section" open={accordionOpen.provider}>
+            <summary
+              className="accordion-summary"
+              onClick={(event) => {
+                event.preventDefault();
+                toggleAccordionSection('provider');
+              }}
+            >
               <div>
                 <p className="eyebrow">Request setup</p>
                 <h3>Provider &amp; Model</h3>
@@ -583,11 +669,15 @@ export default function App() {
                   className="ghost-button"
                   onClick={(event) => {
                     event.preventDefault();
+                    event.stopPropagation();
                     void fetchModels(true);
                   }}
                 >
                   Refresh models
                 </button>
+                <span className={`accordion-chevron ${accordionOpen.provider ? 'is-open' : ''}`} aria-hidden="true">
+                  ⌄
+                </span>
               </div>
             </summary>
 
@@ -598,7 +688,7 @@ export default function App() {
                   className={`provider-pill ${request.provider === provider.id ? 'is-active' : ''}`}
                   onClick={() => setProvider(provider.id)}
                 >
-                  {provider.label}
+                  {getProviderLabel(provider.id, isMobile)}
                 </button>
               ))}
             </div>
@@ -651,12 +741,13 @@ export default function App() {
               {modelsError ? <p className="error-text">{modelsError}</p> : null}
 
               <div className="model-results" role="list">
-                {filteredModels.length > 0 ? (
-                  filteredModels.map((model) => (
+                {visibleModels.length > 0 ? (
+                  visibleModels.map((model) => (
                     <button
                       key={model.id}
                       className={`model-option ${model.id === request.model ? 'is-active' : ''}`}
                       onClick={() => setRequestField('model', model.id)}
+                      title={model.id}
                     >
                       <div className="model-option__row">
                         <div className="model-option__identity">
@@ -685,6 +776,11 @@ export default function App() {
                   <p className="empty-state empty-state--compact">Type to search 300+ models.</p>
                 )}
               </div>
+              {hasMoreModels ? (
+                <button className="secondary-button model-results__more" onClick={() => setShowAllModels(true)}>
+                  Show more
+                </button>
+              ) : null}
             </div>
 
             <div className="selected-model-card">
@@ -698,8 +794,14 @@ export default function App() {
             </div>
           </details>
 
-          <details className="surface accordion-section" open>
-            <summary className="accordion-summary">
+          <details className="surface accordion-section" open={accordionOpen.messages}>
+            <summary
+              className="accordion-summary"
+              onClick={(event) => {
+                event.preventDefault();
+                toggleAccordionSection('messages');
+              }}
+            >
               <div>
                 <p className="eyebrow">Prompting</p>
                 <h3>Messages</h3>
@@ -710,11 +812,15 @@ export default function App() {
                 className="secondary-button"
                 onClick={(event) => {
                   event.preventDefault();
+                  event.stopPropagation();
                   addMessage();
                 }}
               >
                 Add message
               </button>
+              <span className={`accordion-chevron ${accordionOpen.messages ? 'is-open' : ''}`} aria-hidden="true">
+                ⌄
+              </span>
             </summary>
 
             <label className="field">
@@ -755,8 +861,14 @@ export default function App() {
             </div>
           </details>
 
-          <details className="surface accordion-section" open>
-            <summary className="accordion-summary">
+          <details className="surface accordion-section" open={accordionOpen.parameters}>
+            <summary
+              className="accordion-summary"
+              onClick={(event) => {
+                event.preventDefault();
+                toggleAccordionSection('parameters');
+              }}
+            >
               <div>
                 <p className="eyebrow">Request tuning</p>
                 <h3>Parameters</h3>
@@ -764,7 +876,10 @@ export default function App() {
               <div className="accordion-summary__actions">
                 <label
                   className="toggle-row"
-                  onClick={(event) => event.preventDefault()}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
                 >
                   <input
                     type="checkbox"
@@ -778,11 +893,15 @@ export default function App() {
                   className="ghost-button"
                   onClick={(event) => {
                     event.preventDefault();
+                    event.stopPropagation();
                     void onCopyCurl();
                   }}
                 >
                   Copy as cURL
                 </button>
+                <span className={`accordion-chevron ${accordionOpen.parameters ? 'is-open' : ''}`} aria-hidden="true">
+                  ⌄
+                </span>
               </div>
             </summary>
 
@@ -848,6 +967,19 @@ export default function App() {
           </details>
         </aside>
       </main>
+
+      <div className="mobile-send-bar">
+        <button className="primary-button primary-button--hero mobile-send-bar__button" onClick={onSend} disabled={isSending}>
+          {isSending ? (
+            <>
+              <span className="primary-button__spinner" aria-hidden="true" />
+              <span>Sending…</span>
+            </>
+          ) : (
+            'Send request'
+          )}
+        </button>
+      </div>
     </div>
   );
 }
