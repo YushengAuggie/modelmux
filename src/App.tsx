@@ -2,6 +2,7 @@ import { json } from '@codemirror/lang-json';
 import CodeMirror from '@uiw/react-codemirror';
 import { useEffect, useMemo, useState } from 'react';
 import { buildRequestPreview, copyAsCurl, providerOptions } from './adapters';
+import { copy } from './copy';
 import { templates } from './templates';
 import { useAppStore } from './store';
 import type { MessageItem, OpenRouterModel } from './types';
@@ -53,16 +54,16 @@ function MessageRow({
           value={message.role}
           onChange={(event) => onChange(message.id, { role: event.target.value as MessageItem['role'] })}
         >
-          <option value="system">system</option>
-          <option value="user">user</option>
-          <option value="assistant">assistant</option>
-          <option value="tool">tool</option>
+          <option value="system">{copy.roles.system}</option>
+          <option value="user">{copy.roles.user}</option>
+          <option value="assistant">{copy.roles.assistant}</option>
+          <option value="tool">{copy.roles.tool}</option>
         </select>
         {message.role === 'tool' ? (
           <input
             className="min-w-24 flex-1 rounded-md border px-2 py-1 text-sm"
             style={{ borderColor: 'var(--border)', background: 'var(--bg-soft)' }}
-            placeholder="tool name"
+            placeholder={copy.placeholders.toolName}
             value={message.name ?? ''}
             onChange={(event) => onChange(message.id, { name: event.target.value })}
           />
@@ -73,23 +74,26 @@ function MessageRow({
             style={{ borderColor: 'var(--border)' }}
             onClick={() => onMove(message.id, -1)}
             disabled={index === 0}
+            title={copy.tooltips.moveUp}
           >
-            ↑
+            {copy.actions.moveUp}
           </button>
           <button
             className="rounded-md border px-2 py-1 text-xs"
             style={{ borderColor: 'var(--border)' }}
             onClick={() => onMove(message.id, 1)}
             disabled={index === count - 1}
+            title={copy.tooltips.moveDown}
           >
-            ↓
+            {copy.actions.moveDown}
           </button>
           <button
             className="rounded-md border px-2 py-1 text-xs"
             style={{ borderColor: 'var(--border)' }}
             onClick={() => onRemove(message.id)}
+            title={copy.tooltips.removeMessage}
           >
-            remove
+            {copy.actions.remove}
           </button>
         </div>
       </div>
@@ -97,6 +101,7 @@ function MessageRow({
         className="h-24 w-full rounded-md border p-2 text-sm"
         style={{ borderColor: 'var(--border)', background: 'var(--bg-soft)' }}
         value={message.content}
+        placeholder={copy.placeholders.message}
         onChange={(event) => onChange(message.id, { content: event.target.value })}
       />
     </div>
@@ -198,7 +203,10 @@ export default function App() {
   }, [request]);
 
   const requestPreviewJson = useMemo(
-    () => (requestPreview ? JSON.stringify(requestPreview, null, 2) : '{\n  "error": "Model is required"\n}'),
+    () =>
+      requestPreview
+        ? JSON.stringify(requestPreview, null, 2)
+        : `{\n  "error": ${JSON.stringify(copy.errors.modelRequired)}\n}`,
     [requestPreview],
   );
 
@@ -234,25 +242,27 @@ export default function App() {
   return (
     <div className="mx-auto min-h-screen max-w-[1680px] px-3 py-4 md:px-4">
       <header className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border p-3 panel">
-        <h1 className="text-lg font-semibold tracking-tight">API Pilot</h1>
+        <h1 className="text-lg font-semibold tracking-tight">{copy.app.name}</h1>
         <span className="text-sm" style={{ color: 'var(--muted)' }}>
-          LLM API testing tool
+          {copy.app.tagline}
         </span>
         <div className="ml-auto flex gap-2">
           <button
             className="rounded-md border px-3 py-1 text-sm"
             style={{ borderColor: 'var(--border)' }}
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            title={copy.tooltips.themeToggle}
           >
-            {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+            {theme === 'dark' ? copy.header.themeLight : copy.header.themeDark}
           </button>
           <button
             className="rounded-md border px-3 py-1 text-sm"
             style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}
             onClick={onSend}
             disabled={isSending}
+            title={copy.tooltips.send}
           >
-            {isSending ? 'Sending...' : 'Send'}
+            {isSending ? copy.header.sending : copy.header.send}
           </button>
         </div>
       </header>
@@ -261,27 +271,29 @@ export default function App() {
         <section className="space-y-4">
           <div className="panel rounded-xl p-3">
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <h2 className="font-medium">Request Builder</h2>
+              <h2 className="font-medium">{copy.sections.requestBuilder}</h2>
               <label className="ml-auto flex items-center gap-2 text-xs" style={{ color: 'var(--muted)' }}>
                 <input
                   type="checkbox"
                   checked={showRawRequest}
                   onChange={(event) => setShowRawRequest(event.target.checked)}
+                  title={copy.tooltips.rawRequest}
                 />
-                Raw JSON
+                {copy.labels.rawJson}
               </label>
               <button
                 className="rounded-md border px-2 py-1 text-xs"
                 style={{ borderColor: 'var(--border)' }}
                 onClick={onCopyCurl}
+                title={copy.tooltips.copyCurl}
               >
-                Copy as cURL
+                {copy.actions.copyCurl}
               </button>
             </div>
 
             <div className="grid gap-2 md:grid-cols-2">
               <label className="space-y-1 text-sm">
-                <span style={{ color: 'var(--muted)' }}>Provider</span>
+                <span style={{ color: 'var(--muted)' }}>{copy.labels.provider}</span>
                 <select
                   className="w-full rounded-md border px-2 py-2"
                   style={{ borderColor: 'var(--border)', background: 'var(--bg-soft)' }}
@@ -296,12 +308,12 @@ export default function App() {
                 </select>
               </label>
               <label className="space-y-1 text-sm">
-                <span style={{ color: 'var(--muted)' }}>API Key</span>
+                <span style={{ color: 'var(--muted)' }}>{copy.labels.apiKey}</span>
                 <input
                   className="w-full rounded-md border px-2 py-2"
                   style={{ borderColor: 'var(--border)', background: 'var(--bg-soft)' }}
                   type="password"
-                  placeholder="Stored in localStorage only"
+                  placeholder={copy.placeholders.apiKey}
                   value={request.apiKey}
                   onChange={(event) => setRequestField('apiKey', event.target.value)}
                 />
@@ -310,39 +322,41 @@ export default function App() {
 
             <div className="mt-2 grid gap-2 md:grid-cols-2">
               <label className="space-y-1 text-sm">
-                <span style={{ color: 'var(--muted)' }}>Model</span>
+                <span style={{ color: 'var(--muted)' }}>{copy.labels.model}</span>
                 <input
                   className="w-full rounded-md border px-2 py-2"
                   style={{ borderColor: 'var(--border)', background: 'var(--bg-soft)' }}
                   value={request.model}
+                  placeholder={copy.placeholders.model}
                   onChange={(event) => setRequestField('model', event.target.value)}
                 />
               </label>
               <label className="space-y-1 text-sm">
-                <span style={{ color: 'var(--muted)' }}>Base URL</span>
+                <span style={{ color: 'var(--muted)' }}>{copy.labels.baseUrl}</span>
                 <input
                   className="w-full rounded-md border px-2 py-2"
                   style={{ borderColor: 'var(--border)', background: 'var(--bg-soft)' }}
                   value={request.baseUrl}
                   onChange={(event) => setRequestField('baseUrl', event.target.value)}
-                  placeholder="Custom provider base URL"
+                  placeholder={copy.placeholders.baseUrl}
                 />
               </label>
             </div>
 
             <label className="mt-2 block space-y-1 text-sm">
-              <span style={{ color: 'var(--muted)' }}>System Prompt</span>
+              <span style={{ color: 'var(--muted)' }}>{copy.labels.systemPrompt}</span>
               <textarea
                 className="h-20 w-full rounded-md border p-2"
                 style={{ borderColor: 'var(--border)', background: 'var(--bg-soft)' }}
                 value={request.systemPrompt}
+                placeholder={copy.placeholders.systemPrompt}
                 onChange={(event) => setRequestField('systemPrompt', event.target.value)}
               />
             </label>
 
             <div className="mt-3 grid gap-2 md:grid-cols-4">
               <label className="space-y-1 text-sm">
-                <span style={{ color: 'var(--muted)' }}>Temperature</span>
+                <span style={{ color: 'var(--muted)' }}>{copy.labels.temperature}</span>
                 <input
                   className="w-full rounded-md border px-2 py-2"
                   style={{ borderColor: 'var(--border)', background: 'var(--bg-soft)' }}
@@ -355,7 +369,7 @@ export default function App() {
                 />
               </label>
               <label className="space-y-1 text-sm">
-                <span style={{ color: 'var(--muted)' }}>max_tokens</span>
+                <span style={{ color: 'var(--muted)' }}>{copy.labels.maxTokens}</span>
                 <input
                   className="w-full rounded-md border px-2 py-2"
                   style={{ borderColor: 'var(--border)', background: 'var(--bg-soft)' }}
@@ -366,7 +380,7 @@ export default function App() {
                 />
               </label>
               <label className="space-y-1 text-sm">
-                <span style={{ color: 'var(--muted)' }}>top_p</span>
+                <span style={{ color: 'var(--muted)' }}>{copy.labels.topP}</span>
                 <input
                   className="w-full rounded-md border px-2 py-2"
                   style={{ borderColor: 'var(--border)', background: 'var(--bg-soft)' }}
@@ -383,8 +397,9 @@ export default function App() {
                   type="checkbox"
                   checked={request.params.stream}
                   onChange={(event) => setParamsField('stream', event.target.checked)}
+                  title={copy.tooltips.stream}
                 />
-                <span>stream</span>
+                <span>{copy.labels.stream}</span>
               </label>
             </div>
 
@@ -403,24 +418,25 @@ export default function App() {
 
           <div className="panel rounded-xl p-3">
             <div className="mb-2 flex items-center gap-2">
-              <h2 className="font-medium">Model Selector</h2>
+              <h2 className="font-medium">{copy.sections.modelBrowser}</h2>
               <button
                 className="ml-auto rounded-md border px-2 py-1 text-xs"
                 style={{ borderColor: 'var(--border)' }}
                 onClick={() => void fetchModels(true)}
+                title={copy.tooltips.refreshModels}
               >
-                Refresh
+                {copy.actions.refresh}
               </button>
             </div>
             <input
               id="model-search-input"
               className="mb-2 w-full rounded-md border px-2 py-2 text-sm"
               style={{ borderColor: 'var(--border)', background: 'var(--bg-soft)' }}
-              placeholder="Search OpenRouter models"
+              placeholder={copy.placeholders.modelSearch}
               value={modelSearch}
               onChange={(event) => setModelSearch(event.target.value)}
             />
-            {modelsLoading ? <p className="text-sm">Loading models...</p> : null}
+            {modelsLoading ? <p className="text-sm">{copy.states.loadingModels}</p> : null}
             {modelsError ? (
               <p className="text-sm" style={{ color: '#ff8a8a' }}>
                 {modelsError}
@@ -461,13 +477,14 @@ export default function App() {
 
           <div className="panel rounded-xl p-3">
             <div className="mb-2 flex items-center gap-2">
-              <h2 className="font-medium">Messages</h2>
+              <h2 className="font-medium">{copy.sections.messages}</h2>
               <button
                 className="ml-auto rounded-md border px-2 py-1 text-xs"
                 style={{ borderColor: 'var(--border)' }}
                 onClick={addMessage}
+                title={copy.tooltips.addMessage}
               >
-                Add Message
+                {copy.actions.addMessage}
               </button>
             </div>
             <div className="space-y-2">
@@ -486,7 +503,7 @@ export default function App() {
           </div>
 
           <div className="panel rounded-xl p-3">
-            <h2 className="mb-2 font-medium">Templates</h2>
+            <h2 className="mb-2 font-medium">{copy.sections.templates}</h2>
             <div className="grid gap-2 sm:grid-cols-2">
               {templates.map((template) => (
                 <button
@@ -506,41 +523,44 @@ export default function App() {
         <section className="space-y-4">
           <div className="panel rounded-xl p-3">
             <div className="mb-2 flex items-center gap-2">
-              <h2 className="font-medium">Response Viewer</h2>
+              <h2 className="font-medium">{copy.sections.responseViewer}</h2>
               <label className="ml-auto flex items-center gap-2 text-xs" style={{ color: 'var(--muted)' }}>
                 <input
                   type="checkbox"
                   checked={showRawResponse}
                   onChange={(event) => setShowRawResponse(event.target.checked)}
+                  title={copy.tooltips.rawResponse}
                 />
-                Raw JSON
+                {copy.labels.rawJson}
               </label>
               <button
                 className="rounded-md border px-2 py-1 text-xs"
                 style={{ borderColor: 'var(--border)' }}
                 onClick={() => void onCopyResponseText()}
+                title={copy.tooltips.copyText}
               >
-                Copy Text
+                {copy.actions.copyText}
               </button>
             </div>
 
             <div className="mb-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               <div className="rounded-md border p-2 text-xs" style={{ borderColor: 'var(--border)' }}>
-                Status: {response?.status ?? '—'}
+                {copy.labels.status}: {response?.status ?? '—'}
               </div>
               <div className="rounded-md border p-2 text-xs" style={{ borderColor: 'var(--border)' }}>
-                TTFT: {formatMs(response?.ttftMs)}
+                {copy.labels.ttft}: {formatMs(response?.ttftMs)}
               </div>
               <div className="rounded-md border p-2 text-xs" style={{ borderColor: 'var(--border)' }}>
-                Total: {formatMs(response?.totalMs)}
+                {copy.labels.total}: {formatMs(response?.totalMs)}
               </div>
               <div className="rounded-md border p-2 text-xs" style={{ borderColor: 'var(--border)' }}>
-                Cost: {formatCurrency(response?.costEstimateUsd)}
+                {copy.labels.cost}: {formatCurrency(response?.costEstimateUsd)}
               </div>
             </div>
 
             <div className="rounded-md border p-2 text-xs" style={{ borderColor: 'var(--border)' }}>
-              Tokens: in {response?.usage.inputTokens ?? '—'} | out {response?.usage.outputTokens ?? '—'} | total{' '}
+              {copy.labels.tokens}: {copy.labels.input.toLowerCase()} {response?.usage.inputTokens ?? '—'} |{' '}
+              {copy.labels.output.toLowerCase()} {response?.usage.outputTokens ?? '—'} | {copy.labels.totalShort.toLowerCase()}{' '}
               {response?.usage.totalTokens ?? '—'}
             </div>
 
@@ -551,7 +571,7 @@ export default function App() {
             ) : null}
 
             <div className="mt-3 rounded-md border p-3 text-sm leading-relaxed" style={{ borderColor: 'var(--border)' }}>
-              {streamText || response?.extractedText || 'No response text yet.'}
+              {streamText || response?.extractedText || copy.emptyStates.response}
             </div>
 
             {showRawResponse ? (
@@ -567,7 +587,7 @@ export default function App() {
             ) : null}
 
             <details className="mt-3 rounded-md border p-2 text-sm" style={{ borderColor: 'var(--border)' }}>
-              <summary className="cursor-pointer">Status code + headers</summary>
+              <summary className="cursor-pointer">{copy.labels.statusHeaders}</summary>
               <pre className="mt-2 overflow-auto text-xs">
                 {JSON.stringify({ status: response?.status, headers: response?.headers ?? {} }, null, 2)}
               </pre>
@@ -576,20 +596,21 @@ export default function App() {
 
           <div className="panel rounded-xl p-3">
             <div className="mb-2 flex items-center gap-2">
-              <h2 className="font-medium">History</h2>
+              <h2 className="font-medium">{copy.sections.history}</h2>
               <button
                 className="ml-auto rounded-md border px-2 py-1 text-xs"
                 style={{ borderColor: 'var(--border)' }}
                 onClick={clearHistory}
                 disabled={history.length === 0}
+                title={copy.tooltips.clearHistory}
               >
-                Clear
+                {copy.actions.clear}
               </button>
             </div>
             <div className="max-h-[40rem] space-y-2 overflow-auto pr-1">
               {history.length === 0 ? (
                 <p className="text-sm" style={{ color: 'var(--muted)' }}>
-                  No saved requests yet.
+                  {copy.emptyStates.history}
                 </p>
               ) : null}
               {history.map((item) => (
@@ -599,7 +620,7 @@ export default function App() {
                     <span className="text-xs" style={{ color: 'var(--muted)' }}>
                       {new Date(item.timestamp).toLocaleString()}
                     </span>
-                    <span className="ml-auto text-xs">{item.response.status ?? 'error'}</span>
+                    <span className="ml-auto text-xs">{item.response.status ?? copy.history.errorStatus}</span>
                   </div>
                   <div className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>
                     {item.request.provider} · {item.requestPreview.url}
@@ -609,15 +630,17 @@ export default function App() {
                       className="rounded-md border px-2 py-1 text-xs"
                       style={{ borderColor: 'var(--border)' }}
                       onClick={() => replayHistory(item.id)}
+                      title={copy.tooltips.replayHistory}
                     >
-                      Replay
+                      {copy.actions.replay}
                     </button>
                     <button
                       className="rounded-md border px-2 py-1 text-xs"
                       style={{ borderColor: 'var(--border)' }}
                       onClick={() => deleteHistory(item.id)}
+                      title={copy.tooltips.deleteHistory}
                     >
-                      Delete
+                      {copy.actions.delete}
                     </button>
                   </div>
                 </div>
@@ -626,7 +649,12 @@ export default function App() {
           </div>
 
           <div className="panel rounded-xl p-3 text-xs" style={{ color: 'var(--muted)' }}>
-            Selected model metadata: {selectedModelInfo ? `${selectedModelInfo.name} (${selectedModelInfo.provider})` : 'Not in OpenRouter index'}
+            {copy.labels.selectedModel}:{' '}
+            {selectedModelInfo
+              ? `${selectedModelInfo.name} (${selectedModelInfo.provider})`
+              : request.model
+                ? copy.emptyStates.selectedModelMissing
+                : copy.emptyStates.selectedModel}
           </div>
         </section>
       </main>

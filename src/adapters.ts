@@ -7,17 +7,18 @@ import type {
   RequestPreview,
   ResponseState,
 } from './types';
+import { copy, providerCopy } from './copy';
 
 const OPENAI_BASE = 'https://api.openai.com';
 const ANTHROPIC_BASE = 'https://api.anthropic.com';
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com';
 
 export const providerOptions: Array<{ id: ProviderId; label: string }> = [
-  { id: 'openai-chat', label: 'OpenAI (Chat Completions)' },
-  { id: 'openai-responses', label: 'OpenAI (Responses API)' },
-  { id: 'anthropic', label: 'Anthropic' },
-  { id: 'gemini', label: 'Gemini' },
-  { id: 'custom', label: 'Custom (OpenAI-compatible)' },
+  { id: 'openai-chat', label: providerCopy['openai-chat'] },
+  { id: 'openai-responses', label: providerCopy['openai-responses'] },
+  { id: 'anthropic', label: providerCopy.anthropic },
+  { id: 'gemini', label: providerCopy.gemini },
+  { id: 'custom', label: providerCopy.custom },
 ];
 
 function joinUrl(base: string, path: string): string {
@@ -100,7 +101,7 @@ export function buildRequestPreview(config: RequestConfig): RequestPreview {
   const model = config.model.trim();
 
   if (!model) {
-    throw new Error('Model is required');
+    throw new Error(copy.errors.modelRequired);
   }
 
   switch (config.provider) {
@@ -198,7 +199,7 @@ export function buildRequestPreview(config: RequestConfig): RequestPreview {
       };
     }
     default:
-      throw new Error('Unsupported provider');
+      throw new Error(copy.errors.unsupportedProvider);
   }
 }
 
@@ -435,16 +436,16 @@ export async function sendRequest(
 function providerErrorHint(provider: ProviderId, raw: string): string | undefined {
   const lower = raw.toLowerCase();
   if (provider === 'anthropic' && lower.includes('max_tokens')) {
-    return 'Anthropic requires `max_tokens` as a top-level field.';
+    return copy.errors.anthropicMaxTokens;
   }
   if ((provider === 'openai-chat' || provider === 'openai-responses' || provider === 'custom') && lower.includes('api key')) {
-    return 'OpenAI-compatible providers require `Authorization: Bearer <key>`.';
+    return copy.errors.openAiKey;
   }
   if (provider === 'gemini' && lower.includes('api key')) {
-    return 'Gemini requires `x-goog-api-key` header and model in URL path.';
+    return copy.errors.geminiKey;
   }
   if (provider === 'custom' && lower.includes('failed to fetch')) {
-    return 'Custom endpoint may block CORS. Check base URL and local server availability.';
+    return copy.errors.customCors;
   }
   return undefined;
 }

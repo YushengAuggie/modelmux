@@ -3,8 +3,8 @@ import type { TemplateItem } from './types';
 export const templates: TemplateItem[] = [
   {
     id: 'simple-conversation',
-    name: 'Simple Conversation',
-    description: 'Basic assistant interaction',
+    name: '💬 Quick chat',
+    description: 'Start with one user message and see a plain text reply.',
     request: {
       provider: 'openai-chat',
       model: 'openai/gpt-4o-mini',
@@ -15,8 +15,8 @@ export const templates: TemplateItem[] = [
   },
   {
     id: 'json-output',
-    name: 'JSON Output',
-    description: 'Structured output test',
+    name: '🔧 JSON reply',
+    description: 'Ask for structured output and inspect how the model formats it.',
     request: {
       provider: 'openai-chat',
       model: 'openai/gpt-4o-mini',
@@ -33,8 +33,8 @@ export const templates: TemplateItem[] = [
   },
   {
     id: 'tool-calling-weather',
-    name: 'Tool Calling',
-    description: 'Weather function tool payload example',
+    name: '🔧 Tool call',
+    description: 'Try a tool-ready prompt with a simple weather example.',
     request: {
       provider: 'openai-chat',
       model: 'openai/gpt-4.1-mini',
@@ -47,8 +47,8 @@ export const templates: TemplateItem[] = [
   },
   {
     id: 'web-search',
-    name: 'Web Search',
-    description: 'Responses API with web_search_preview',
+    name: '🔍 Web search',
+    description: 'Use the Responses API shape for web-grounded answers.',
     request: {
       provider: 'openai-responses',
       model: 'openai/gpt-4.1',
@@ -59,8 +59,8 @@ export const templates: TemplateItem[] = [
   },
   {
     id: 'multi-turn-tool',
-    name: 'Multi-turn Tool',
-    description: 'Tool call and tool result continuation',
+    name: '💬 Tool follow-up',
+    description: 'Replay a tool call, a tool result, and the next user turn.',
     request: {
       provider: 'openai-chat',
       model: 'openai/gpt-4.1-mini',
@@ -84,8 +84,8 @@ export const templates: TemplateItem[] = [
   },
   {
     id: 'vision',
-    name: 'Vision Prompt',
-    description: 'Image URL prompt structure',
+    name: '👁 Vision URL',
+    description: 'Send an image URL in the prompt and check the response shape.',
     request: {
       provider: 'openai-chat',
       model: 'openai/gpt-4o',
@@ -102,8 +102,8 @@ export const templates: TemplateItem[] = [
   },
   {
     id: 'anthropic-thinking',
-    name: 'Extended Thinking',
-    description: 'Anthropic thinking-style prompt',
+    name: '🧠 Thinking test',
+    description: 'Run a reasoning-style prompt against Anthropic format.',
     request: {
       provider: 'anthropic',
       model: 'anthropic/claude-sonnet-4',
@@ -119,8 +119,8 @@ export const templates: TemplateItem[] = [
   },
   {
     id: 'streaming-haiku',
-    name: 'Streaming Haiku',
-    description: 'Streaming response comparison prompt',
+    name: '⚡ Stream test',
+    description: 'Watch tokens arrive live with a short prompt.',
     request: {
       provider: 'openai-chat',
       model: 'openai/gpt-4.1-mini',
@@ -130,8 +130,8 @@ export const templates: TemplateItem[] = [
   },
   {
     id: 'system-prompt-test',
-    name: 'System Prompt Test',
-    description: 'Persona prompt sensitivity test',
+    name: '🏴‍☠️ Persona check',
+    description: 'See how strongly the model follows a playful system prompt.',
     request: {
       provider: 'openai-chat',
       model: 'openai/gpt-4.1-mini',
@@ -142,8 +142,8 @@ export const templates: TemplateItem[] = [
   },
   {
     id: 'local-model',
-    name: 'Local Model',
-    description: 'Custom base URL for Ollama/LM Studio/vLLM',
+    name: '🏠 Local model',
+    description: 'Point at Ollama, LM Studio, or any OpenAI-style local endpoint.',
     request: {
       provider: 'custom',
       baseUrl: 'http://localhost:11434/v1',

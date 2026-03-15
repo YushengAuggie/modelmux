@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { sendRequest } from './adapters';
+import { copy } from './copy';
 import { fetchOpenRouterModels } from './models';
 import { templates } from './templates';
 import type { AppState, HistoryItem, MessageItem, OpenRouterModel, ProviderId, RequestConfig, ResponseState } from './types';
@@ -10,8 +11,8 @@ const defaultRequest: RequestConfig = {
   model: 'openai/gpt-4o-mini',
   apiKey: '',
   baseUrl: 'http://localhost:11434/v1',
-  systemPrompt: 'You are a helpful assistant.',
-  messages: [{ id: crypto.randomUUID(), role: 'user', content: 'Hello, what can you do?' }],
+  systemPrompt: copy.defaults.systemPrompt,
+  messages: [{ id: crypto.randomUUID(), role: 'user', content: copy.defaults.firstMessage }],
   params: {
     temperature: 0.7,
     maxTokens: 800,
@@ -187,7 +188,7 @@ export const useAppStore = create<AppStore>()(
         } catch (error) {
           set({
             modelsLoading: false,
-            modelsError: error instanceof Error ? error.message : 'Failed to load models',
+            modelsError: error instanceof Error ? error.message : copy.errors.loadModels,
           });
         }
       },
@@ -219,7 +220,7 @@ export const useAppStore = create<AppStore>()(
               json: undefined,
               extractedText: '',
               usage: {},
-              errorHint: 'Request failed before receiving a response. Check endpoint, key, and CORS policy.',
+              errorHint: copy.errors.sendFailed,
             },
           });
         }
