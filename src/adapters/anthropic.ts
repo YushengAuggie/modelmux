@@ -7,9 +7,12 @@ export function buildRequest(config: RequestConfig): RequestPreview {
     throw new Error('Model is required');
   }
 
+  // Use baseUrl when set (e.g. Poe API proxy), otherwise default to Anthropic
+  const hasCustomBase = config.baseUrl && config.baseUrl.trim() && config.baseUrl.trim() !== 'http://localhost:11434/v1';
+  const base = hasCustomBase ? config.baseUrl!.trim() : ANTHROPIC_BASE;
   return {
     method: 'POST',
-    url: joinUrl(ANTHROPIC_BASE, '/v1/messages'),
+    url: joinUrl(base, '/v1/messages'),
     headers: {
       'content-type': 'application/json',
       'x-api-key': config.apiKey.trim(),

@@ -28,9 +28,12 @@ export function buildRequest(config: RequestConfig): RequestPreview {
     throw new Error('Model is required');
   }
 
+  // Use baseUrl when set (e.g. Poe API proxy), otherwise default to OpenAI
+  const hasCustomBase = config.baseUrl && config.baseUrl.trim() && config.baseUrl.trim() !== 'http://localhost:11434/v1';
+  const base = hasCustomBase ? config.baseUrl!.trim() : OPENAI_BASE;
   return {
     method: 'POST',
-    url: joinUrl(OPENAI_BASE, '/v1/responses'),
+    url: joinUrl(base, '/v1/responses'),
     headers: {
       'content-type': 'application/json',
       authorization: `Bearer ${config.apiKey.trim()}`,
