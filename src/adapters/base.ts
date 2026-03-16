@@ -24,6 +24,9 @@ export const ANTHROPIC_BASE = 'https://api.anthropic.com';
 /** Default Gemini API origin. */
 export const GEMINI_BASE = 'https://generativelanguage.googleapis.com';
 
+/** Default local OpenAI-compatible origin used for custom providers. */
+export const LOCAL_OPENAI_COMPAT_BASE = 'http://localhost:11434/v1';
+
 /** Provider choices available in the UI. */
 export const providerOptions: ProviderOption[] = [
   { id: 'openai-chat', label: 'OpenAI (Chat Completions)' },
@@ -36,6 +39,15 @@ export const providerOptions: ProviderOption[] = [
 /** Safely joins a base URL and path. */
 export function joinUrl(base: string, path: string): string {
   return `${base.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
+}
+
+/** Returns a custom override base URL when it should replace provider defaults. */
+export function getCustomBaseUrl(baseUrl: string): string | undefined {
+  const trimmed = baseUrl.trim();
+  if (!trimmed || trimmed === LOCAL_OPENAI_COMPAT_BASE) {
+    return undefined;
+  }
+  return trimmed;
 }
 
 /** Returns trimmed message content. */

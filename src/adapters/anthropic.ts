@@ -1,5 +1,12 @@
 import type { NormalizedUsage, RequestConfig, RequestPreview } from '@/types';
-import { ANTHROPIC_BASE, joinUrl, numberOrUndefined, toAnthropicMessages, type ProviderAdapter } from '@/adapters/base';
+import {
+  ANTHROPIC_BASE,
+  getCustomBaseUrl,
+  joinUrl,
+  numberOrUndefined,
+  toAnthropicMessages,
+  type ProviderAdapter,
+} from '@/adapters/base';
 
 /** Builds an Anthropic messages request preview. */
 export function buildRequest(config: RequestConfig): RequestPreview {
@@ -7,11 +14,9 @@ export function buildRequest(config: RequestConfig): RequestPreview {
     throw new Error('Model is required');
   }
 
-  // Use baseUrl when set (e.g. Poe API proxy), otherwise default to Anthropic
-  const hasCustomBase = config.baseUrl && config.baseUrl.trim() && config.baseUrl.trim() !== 'http://localhost:11434/v1';
-  const base = hasCustomBase ? config.baseUrl!.trim() : ANTHROPIC_BASE;
-  // If custom base already ends with /v1, only append /messages
-  const path = hasCustomBase ? '/messages' : '/v1/messages';
+  const customBase = getCustomBaseUrl(config.baseUrl);
+  const base = customBase || ANTHROPIC_BASE;
+  const path = customBase ? '/messages' : '/v1/messages';
   return {
     method: 'POST',
     url: joinUrl(base, path),

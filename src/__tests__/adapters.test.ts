@@ -72,6 +72,26 @@ describe('buildRequestPreview', () => {
     ]);
   });
 
+  it('uses a custom base URL for built-in OpenAI chat providers', () => {
+    const preview = buildRequestPreview({
+      ...baseConfig,
+      provider: 'openai-chat',
+      baseUrl: 'https://proxy.example.com/v1',
+    });
+
+    expect(preview.url).toBe('https://proxy.example.com/v1/chat/completions');
+  });
+
+  it('uses a custom base URL for Responses providers', () => {
+    const preview = buildRequestPreview({
+      ...baseConfig,
+      provider: 'openai-responses',
+      baseUrl: 'https://proxy.example.com/v1',
+    });
+
+    expect(preview.url).toBe('https://proxy.example.com/v1/responses');
+  });
+
   it('builds Anthropic previews with required headers', () => {
     const preview = buildRequestPreview({
       ...baseConfig,
@@ -87,6 +107,16 @@ describe('buildRequestPreview', () => {
       { role: 'user', content: [{ type: 'text', text: 'Hello' }] },
       { role: 'user', content: [{ type: 'text', text: 'result' }] },
     ]);
+  });
+
+  it('uses a custom base URL for Anthropic providers', () => {
+    const preview = buildRequestPreview({
+      ...baseConfig,
+      provider: 'anthropic',
+      baseUrl: 'https://proxy.example.com/v1',
+    });
+
+    expect(preview.url).toBe('https://proxy.example.com/v1/messages');
   });
 
   it('builds Gemini previews with model in URL path', () => {
@@ -110,6 +140,17 @@ describe('buildRequestPreview', () => {
         topP: 0.9,
       },
     });
+  });
+
+  it('uses a custom base URL for Gemini providers', () => {
+    const preview = buildRequestPreview({
+      ...baseConfig,
+      provider: 'gemini',
+      model: 'gemini-2.0-flash',
+      baseUrl: 'https://proxy.example.com/gemini',
+    });
+
+    expect(preview.url).toBe('https://proxy.example.com/gemini/models/gemini-2.0-flash:generateContent');
   });
 
   it('throws when model is blank', () => {

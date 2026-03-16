@@ -1,5 +1,5 @@
 import type { NormalizedUsage, RequestConfig, RequestPreview } from '@/types';
-import { GEMINI_BASE, joinUrl, numberOrUndefined, toGeminiContents, type ProviderAdapter } from '@/adapters/base';
+import { GEMINI_BASE, getCustomBaseUrl, joinUrl, numberOrUndefined, toGeminiContents, type ProviderAdapter } from '@/adapters/base';
 
 /** Builds a Gemini generateContent request preview. */
 export function buildRequest(config: RequestConfig): RequestPreview {
@@ -8,13 +8,14 @@ export function buildRequest(config: RequestConfig): RequestPreview {
     throw new Error('Model is required');
   }
 
+  const customBase = getCustomBaseUrl(config.baseUrl);
   const path = config.params.stream
-    ? `/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`
-    : `/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+    ? `${customBase ? '' : '/v1beta'}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`
+    : `${customBase ? '' : '/v1beta'}/models/${encodeURIComponent(model)}:generateContent`;
 
   return {
     method: 'POST',
-    url: joinUrl(GEMINI_BASE, path),
+    url: joinUrl(customBase || GEMINI_BASE, path),
     headers: {
       'content-type': 'application/json',
       'x-goog-api-key': config.apiKey.trim(),

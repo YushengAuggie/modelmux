@@ -1,12 +1,12 @@
 import { json } from '@codemirror/lang-json';
 import CodeMirror from '@uiw/react-codemirror';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildRequestPreview, providerOptions } from '@/adapters';
 
 import { templates } from '@/templates';
 import { useAppStore } from '@/store';
 import { useSendRequest } from '@/hooks/useSendRequest';
-import type { MessageItem, OpenRouterModel, ProviderId } from '@/types';
+import type { MessageItem, OpenRouterModel, ProviderId, ResponseState } from '@/types';
 
 const MOBILE_BREAKPOINT = 767;
 
@@ -146,6 +146,15 @@ function formatMs(value?: number): string {
   return value !== undefined ? `${Math.round(value)} ms` : 'Pending';
 }
 
+function formatHistoryTimestamp(value: string): string {
+  return new Date(value).toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 function capabilityBadges(model: OpenRouterModel): string[] {
   const badges: string[] = [];
   if (model.supportsTools) badges.push('Tools');
@@ -190,6 +199,12 @@ function getProviderLabel(provider: ProviderId, compact: boolean): string {
     default:
       return provider;
   }
+}
+
+function isAuthError(response?: ResponseState): boolean {
+  if (!response) return false;
+  if (response.status === 401 || response.status === 403) return true;
+  return /invalid api key|api key|unauthorized|forbidden/i.test(response.rawText);
 }
 
 function MessageBubble({
@@ -285,15 +300,18 @@ export default function App() {
   } = useAppStore();
 
   const { streamText, send, copyRequestCurl, copyResponseText, clearStreamText } = useSendRequest();
+  const apiKeyFieldRef = useRef<HTMLInputElement>(null);
+  const providerSectionRef = useRef<HTMLElement>(null);
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === 'undefined') return false;
     return window.innerWidth <= MOBILE_BREAKPOINT;
   });
   const [historyOpen, setHistoryOpen] = useState(true);
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
+  const [highlightApiKey, setHighlightApiKey] = useState(false);
   const [showAllModels, setShowAllModels] = useState(false);
   const [accordionOpen, setAccordionOpen] = useState({
-    provider: true,
-    messages: false,
+    messages: true,
     parameters: false,
   });
 
@@ -320,12 +338,14 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    setAccordionOpen(
-      isMobile
-        ? { provider: true, messages: false, parameters: false }
-        : { provider: true, messages: true, parameters: true },
-    );
+    setAccordionOpen({ messages: true, parameters: false });
   }, [isMobile]);
+
+  useEffect(() => {
+    if (!highlightApiKey) return undefined;
+    const timer = window.setTimeout(() => setHighlightApiKey(false), 2200);
+    return () => window.clearTimeout(timer);
+  }, [highlightApiKey]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -415,8 +435,11 @@ export default function App() {
   );
 
   const providerLabel = getProviderLabel(request.provider, false);
-  const visibleModels = isMobile && !showAllModels ? filteredModels.slice(0, 3) : filteredModels.slice(0, 5);
-  const hasMoreModels = isMobile && filteredModels.length > 3 && !showAllModels;
+  const visibleModels = showAllModels ? filteredModels : filteredModels.slice(0, 5);
+  const hasMoreModels = filteredModels.length > 5 && !showAllModels;
+  const hasSentRequest = Boolean(response || history.length > 0 || isSending);
+  const showSetupFirst = !hasSentRequest;
+  const authError = isAuthError(response);
 
   const onSend = () => {
     clearStreamText();
@@ -434,6 +457,529 @@ export default function App() {
   const toggleAccordionSection = (section: keyof typeof accordionOpen) => {
     setAccordionOpen((current) => ({ ...current, [section]: !current[section] }));
   };
+
+  const focusApiKeyField = () => {
+    providerSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.setTimeout(() => apiKeyFieldRef.current?.focus(), 150);
+    setHighlightApiKey(true);
+  };
+
+  const responsePanel = (
+    <section className="response-column">
+      <div className={`surface surface--hero ${hasSentRequest ? '' : 'surface--compact'}`}>
+        <div className="response-headline">
+          <div>
+            <p className="eyebrow">Response</p>
+            <h2>{hasSentRequest ? 'Inspect output, timing, and errors in one place.' : 'Results appear here after your first request.'}</h2>
+            <p className="section-intro">
+              {hasSentRequest
+                ? 'Keep the response open while you compare model behavior, latency, and payload details.'
+                : 'Send a request to see results here.'}
+            </p>
+          </div>
+          <div className="response-headline__actions">
+            <span className={`status-pill status-pill--response ${isSending ? 'is-live' : hasResponse ? 'is-ready' : ''}`}>
+              {isSending ? 'Streaming response' : hasResponse ? 'Response ready' : 'Waiting for request'}
+            </span>
+            <button className="secondary-button" onClick={() => void onCopyResponseText()} disabled={!responseText}>
+              Copy text
+            </button>
+            <label className="toggle-row">
+              <input
+                type="checkbox"
+                checked={showRawResponse}
+                onChange={(event) => setShowRawResponse(event.target.checked)}
+              />
+              <span>Raw JSON</span>
+            </label>
+          </div>
+        </div>
+
+        <div className="metric-chip-row" aria-label="Response metrics">
+          <span className={`metric-chip metric-chip--status tone-${statusTone} ${isSending ? 'is-pulsing' : ''}`}>
+            <span className="metric-chip__label">Status</span>
+            <strong className="status-value">
+              <span className="status-indicator" aria-hidden="true" />
+              <span>{response?.status ?? 'Not run yet'}</span>
+            </strong>
+          </span>
+          <span className={`metric-chip ${isSending ? 'is-pulsing' : ''}`}>
+            <span className="metric-chip__label">TTFT</span>
+            <strong>{formatMs(response?.ttftMs)}</strong>
+          </span>
+          <span className={`metric-chip ${isSending ? 'is-pulsing' : ''}`}>
+            <span className="metric-chip__label">Total time</span>
+            <strong>{formatMs(response?.totalMs)}</strong>
+          </span>
+          <span className={`metric-chip ${isSending ? 'is-pulsing' : ''}`}>
+            <span className="metric-chip__label">Cost</span>
+            <strong>{formatCurrency(response?.costEstimateUsd)}</strong>
+          </span>
+        </div>
+
+        <div className="token-bar">
+          <span>Input {response?.usage.inputTokens ?? 'Pending'}</span>
+          <span>Output {response?.usage.outputTokens ?? 'Pending'}</span>
+          <span>Total {response?.usage.totalTokens ?? 'Pending'}</span>
+        </div>
+
+        {authError ? (
+          <div className="error-banner error-banner--actionable" role="alert">
+            <div>
+              <strong>Invalid API key</strong>
+              <p>Check your key in the Provider &amp; Model section.</p>
+            </div>
+            <button className="secondary-button" onClick={focusApiKeyField}>
+              Go to API key
+            </button>
+          </div>
+        ) : response?.errorHint ? (
+          <div className="error-banner">{response.errorHint}</div>
+        ) : null}
+
+        <article className={`response-output ${isSending ? 'is-loading' : ''} ${hasResponse ? '' : 'is-empty'}`} aria-live="polite">
+          {responseText ? (
+            responseJsonPreview !== undefined ? (
+              <pre className="json-response">
+                <code>{renderJsonNode(responseJsonPreview)}</code>
+              </pre>
+            ) : (
+              <pre>{responseText}</pre>
+            )
+          ) : (
+            <div className="empty-state empty-state--guided">
+              <div className="empty-state__art" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </div>
+              <p className="empty-state__title">{isSending ? 'Waiting for the first tokens…' : 'Send a request to see results here'}</p>
+              <p className="empty-state__body">
+                {isSending
+                  ? 'The model is processing your request. Streaming text will appear here as soon as it arrives.'
+                  : '1. Pick a provider tab → 2. Enter your API key → 3. Choose a model → 4. Hit Send'}
+              </p>
+              {!isSending ? (
+                <p className="empty-state__hint">
+                  {isMobile ? 'Your setup panel comes first on mobile.' : 'Start in Provider & Model, then come back here to compare results.'}
+                </p>
+              ) : (
+                <div className="typing-indicator" aria-label="Response in progress">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              )}
+            </div>
+          )}
+        </article>
+
+        {showRawResponse ? (
+          <div className="code-panel">
+            <CodeMirror
+              value={responseJson}
+              editable={false}
+              height="320px"
+              extensions={[json()]}
+              theme={theme === 'dark' ? 'dark' : 'light'}
+            />
+          </div>
+        ) : null}
+
+        <details className="detail-panel">
+          <summary>Status code and headers</summary>
+          <pre>{JSON.stringify({ status: response?.status, headers: response?.headers ?? {} }, null, 2)}</pre>
+        </details>
+      </div>
+
+      <section className="surface">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">History</p>
+            <h3>Recent runs</h3>
+          </div>
+          <div className="section-heading__actions">
+            <button className="ghost-button" onClick={() => setHistoryOpen((open) => !open)}>
+              {historyOpen ? 'Collapse' : 'Expand'}
+            </button>
+            <button className="ghost-button" onClick={clearHistory} disabled={history.length === 0}>
+              Clear
+            </button>
+          </div>
+        </div>
+
+        {historyOpen ? (
+          <div className="history-list">
+            {history.length === 0 ? <p className="empty-state empty-state--compact">Your requests will appear here.</p> : null}
+            {history.map((item) => {
+              const isExpanded = expandedHistoryId === item.id;
+              return (
+                <details key={item.id} className="history-card" open={isExpanded}>
+                  <summary
+                    className="history-card__summary"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setExpandedHistoryId((current) => (current === item.id ? null : item.id));
+                    }}
+                  >
+                    <strong
+                      className="history-card__identity"
+                      title={`${providerOptions.find((provider) => provider.id === item.request.provider)?.label ?? item.request.provider} · ${item.request.model}`}
+                    >
+                      {providerOptions.find((provider) => provider.id === item.request.provider)?.label ?? item.request.provider}
+                      {' · '}
+                      {item.request.model}
+                    </strong>
+                    <span className="history-card__summary-meta">{formatHistoryTimestamp(item.timestamp)}</span>
+                    <span className={`status-pill tone-${getStatusTone(item.response.status)}`}>
+                      <span className="status-indicator" aria-hidden="true" />
+                      <span>{item.response.status ?? 'error'}</span>
+                    </span>
+                    <span className="history-card__summary-meta">{formatMs(item.response.totalMs)}</span>
+                  </summary>
+                  <div className="history-card__content">
+                    <p className="history-meta">{item.requestPreview.url}</p>
+                    <p className="history-preview">{item.response.extractedText || item.response.rawText || 'No response body captured.'}</p>
+                    <div className="history-actions">
+                      <button className="secondary-button" onClick={() => replayHistory(item.id)}>
+                        Replay
+                      </button>
+                      <button className="ghost-button" onClick={() => deleteHistory(item.id)}>
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </details>
+              );
+            })}
+          </div>
+        ) : null}
+      </section>
+    </section>
+  );
+
+  const controlsPanel = (
+    <aside className="control-column">
+      <section ref={providerSectionRef} className={`surface accordion-section surface--setup ${showSetupFirst ? 'surface--setup-active' : ''}`}>
+        <div className="accordion-summary accordion-summary--static">
+          <div>
+            <p className="eyebrow">Request setup</p>
+            <h3>Provider &amp; Model</h3>
+            <p className="section-intro">Start here. Pick the provider, add credentials, then choose a model before sending.</p>
+          </div>
+          <div className="accordion-summary__actions">
+            <span className="shortcut-hint">Cmd/Ctrl + K</span>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => {
+                void fetchModels(true);
+              }}
+            >
+              Refresh models
+            </button>
+          </div>
+        </div>
+
+        {!hasSentRequest ? (
+          <div className="getting-started-card" role="note" aria-label="Getting started">
+            <div className="getting-started-card__badge">Start here</div>
+            <p className="getting-started-card__title">Run your first request</p>
+            <p className="getting-started-card__steps">1. Pick a provider tab → 2. Enter your API key → 3. Choose a model → 4. Hit Send</p>
+          </div>
+        ) : null}
+
+        <div className="provider-pills" role="tablist" aria-label="Provider selection">
+          {providerOptions.map((provider) => (
+            <button
+              key={provider.id}
+              className={`provider-pill ${request.provider === provider.id ? 'is-active' : ''}`}
+              onClick={() => setProvider(provider.id)}
+            >
+              {getProviderLabel(provider.id, isMobile)}
+            </button>
+          ))}
+        </div>
+
+        <div className="field-grid">
+          <label className="field">
+            <span>API key</span>
+            <input
+              ref={apiKeyFieldRef}
+              className={`control-input ${highlightApiKey ? 'control-input--highlighted' : ''}`}
+              type="password"
+              placeholder="Stored in localStorage only"
+              value={request.apiKey}
+              onChange={(event) => setRequestField('apiKey', event.target.value)}
+            />
+          </label>
+
+          <label className="field">
+            <span>Base URL</span>
+            <input
+              className="control-input mono-text"
+              value={request.baseUrl}
+              onChange={(event) => setRequestField('baseUrl', event.target.value)}
+              placeholder="Optional proxy or gateway URL"
+            />
+            <small className="field-hint">Optional override for any provider. Leave the default value to use official provider endpoints.</small>
+          </label>
+        </div>
+
+        <div className="model-search-panel">
+          <label className="field">
+            <span>Model search</span>
+            <input
+              id="model-search-input"
+              className="control-input"
+              placeholder="Search models, providers, or IDs"
+              value={modelSearch}
+              onChange={(event) => setModelSearch(event.target.value)}
+            />
+          </label>
+
+          <label className="field">
+            <span>Selected model</span>
+            <input
+              className="control-input mono-text"
+              value={request.model}
+              onChange={(event) => setRequestField('model', event.target.value)}
+            />
+          </label>
+
+          {modelsLoading ? <p className="helper-text">Loading models…</p> : null}
+          {modelsError ? <p className="error-text">{modelsError}</p> : null}
+
+          <div className="model-results" role="list">
+            {visibleModels.length > 0 ? (
+              visibleModels.map((model) => (
+                <button
+                  key={model.id}
+                  className={`model-option ${model.id === request.model ? 'is-active' : ''}`}
+                  onClick={() => setRequestField('model', model.id)}
+                  title={model.id}
+                >
+                  <div className="model-option__row">
+                    <div className="model-option__identity">
+                      <strong>{model.name}</strong>
+                      <p className="model-option__id">{model.id}</p>
+                    </div>
+                    <div className="model-option__metrics">
+                      <span>{model.contextLength.toLocaleString()} ctx</span>
+                      <span>In ${(model.promptPricePerToken * 1_000_000).toFixed(2)}/1M</span>
+                      <span>Out ${(model.completionPricePerToken * 1_000_000).toFixed(2)}/1M</span>
+                    </div>
+                  </div>
+                  <div className="model-option__meta">
+                    <span>{model.provider}</span>
+                    <div className="badge-row">
+                      {capabilityBadges(model).map((badge) => (
+                        <span key={badge} className="mini-badge">
+                          {badge}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </button>
+              ))
+            ) : (
+              <p className="empty-state empty-state--compact">Type to search 300+ models.</p>
+            )}
+          </div>
+          {hasMoreModels ? (
+            <button className="secondary-button model-results__more" onClick={() => setShowAllModels(true)}>
+              Show more
+            </button>
+          ) : null}
+        </div>
+
+        <div className="selected-model-card">
+          <span className="eyebrow">Active model</span>
+          <strong>{selectedModelInfo ? selectedModelInfo.name : request.model || 'Not selected'}</strong>
+          <p>
+            {selectedModelInfo
+              ? `${selectedModelInfo.provider} · ${selectedModelInfo.contextLength.toLocaleString()} token context`
+              : 'Not in the OpenRouter index. You can still send to compatible endpoints.'}
+          </p>
+        </div>
+      </section>
+
+      <details className="surface accordion-section" open={accordionOpen.messages}>
+        <summary
+          className="accordion-summary"
+          onClick={(event) => {
+            event.preventDefault();
+            toggleAccordionSection('messages');
+          }}
+        >
+          <div>
+            <p className="eyebrow">Prompting</p>
+            <h3>Messages</h3>
+            <p className="section-intro">Templates sit above the editor so you can start with a preset, then adjust the prompt.</p>
+          </div>
+          <div className="accordion-summary__actions">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                addMessage();
+              }}
+            >
+              Add message
+            </button>
+            <span className={`accordion-chevron ${accordionOpen.messages ? 'is-open' : ''}`} aria-hidden="true">
+              ⌄
+            </span>
+          </div>
+        </summary>
+
+        <div className="template-strip" aria-label="Prompt templates">
+          {templates.map((template) => (
+            <button
+              key={template.id}
+              className={`template-chip ${activeTemplateId === template.id ? 'is-active' : ''}`}
+              onClick={() => applyTemplate(template.id)}
+            >
+              <span>{template.name}</span>
+              <small>{template.description}</small>
+            </button>
+          ))}
+        </div>
+
+        <label className="field">
+          <span>System prompt</span>
+          <textarea
+            className="control-input control-textarea"
+            value={request.systemPrompt}
+            onChange={(event) => setRequestField('systemPrompt', event.target.value)}
+            placeholder="Set behavior, constraints, or persona"
+          />
+        </label>
+
+        <div className="message-list">
+          {request.messages.map((message, index) => (
+            <MessageBubble
+              key={message.id}
+              message={message}
+              index={index}
+              count={request.messages.length}
+              onChange={updateMessage}
+              onRemove={removeMessage}
+              onMove={moveMessage}
+            />
+          ))}
+        </div>
+      </details>
+
+      <details className="surface accordion-section" open={accordionOpen.parameters}>
+        <summary
+          className="accordion-summary"
+          onClick={(event) => {
+            event.preventDefault();
+            toggleAccordionSection('parameters');
+          }}
+        >
+          <div>
+            <p className="eyebrow">Advanced</p>
+            <h3>Parameters</h3>
+            <p className="section-intro">Collapsed by default to keep the main flow focused on setup and prompting.</p>
+          </div>
+          <div className="accordion-summary__actions">
+            <label
+              className="toggle-row"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={showRawRequest}
+                onChange={(event) => setShowRawRequest(event.target.checked)}
+              />
+              <span>Raw JSON</span>
+            </label>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                void onCopyCurl();
+              }}
+            >
+              Copy as cURL
+            </button>
+            <span className={`accordion-chevron ${accordionOpen.parameters ? 'is-open' : ''}`} aria-hidden="true">
+              ⌄
+            </span>
+          </div>
+        </summary>
+
+        <div className="field-grid field-grid--metrics">
+          <label className="field">
+            <span>Temperature</span>
+            <input
+              className="control-input"
+              type="number"
+              step="0.1"
+              min="0"
+              max="2"
+              value={request.params.temperature}
+              onChange={(event) => setParamsField('temperature', Number(event.target.value))}
+            />
+          </label>
+          <label className="field">
+            <span>Max tokens</span>
+            <input
+              className="control-input"
+              type="number"
+              min="1"
+              value={request.params.maxTokens}
+              onChange={(event) => setParamsField('maxTokens', Number(event.target.value))}
+            />
+          </label>
+          <label className="field">
+            <span>Top P</span>
+            <input
+              className="control-input"
+              type="number"
+              step="0.1"
+              min="0"
+              max="1"
+              value={request.params.topP}
+              onChange={(event) => setParamsField('topP', Number(event.target.value))}
+            />
+          </label>
+          <label className="toggle-card">
+            <span>
+              <strong>Streaming</strong>
+              <small>Receive tokens incrementally</small>
+            </span>
+            <input
+              type="checkbox"
+              checked={request.params.stream}
+              onChange={(event) => setParamsField('stream', event.target.checked)}
+            />
+          </label>
+        </div>
+
+        {showRawRequest ? (
+          <div className="code-panel">
+            <CodeMirror
+              value={requestPreviewJson}
+              editable={false}
+              height="280px"
+              extensions={[json()]}
+              theme={theme === 'dark' ? 'dark' : 'light'}
+            />
+          </div>
+        ) : null}
+      </details>
+    </aside>
+  );
 
   return (
     <div className="app-shell">
@@ -480,492 +1026,18 @@ export default function App() {
         </div>
       </header>
 
-      <main className="workspace-grid">
-        <section className="response-column">
-          <div className="surface surface--hero">
-            <div className="response-headline">
-              <div>
-                <p className="eyebrow">Response</p>
-                <h2>Inspect output first, then tune the request.</h2>
-                <p className="section-intro">
-                  The output area stays front-and-center so you can compare latency, tokens, and text without hunting.
-                </p>
-              </div>
-              <div className="response-headline__actions">
-                <span className={`status-pill status-pill--response ${isSending ? 'is-live' : hasResponse ? 'is-ready' : ''}`}>
-                  {isSending ? 'Streaming response' : hasResponse ? 'Response ready' : 'Waiting for request'}
-                </span>
-                <button className="secondary-button" onClick={() => void onCopyResponseText()} disabled={!responseText}>
-                  Copy text
-                </button>
-                <label className="toggle-row">
-                  <input
-                    type="checkbox"
-                    checked={showRawResponse}
-                    onChange={(event) => setShowRawResponse(event.target.checked)}
-                  />
-                  <span>Raw JSON</span>
-                </label>
-              </div>
-            </div>
-
-            <div className="stats-grid">
-              <div className={`stat-card stat-card--status tone-${statusTone} ${isSending ? 'is-pulsing' : ''}`}>
-                <span className="stat-label">Status</span>
-                <strong className="status-value">
-                  <span className="status-indicator" aria-hidden="true" />
-                  <span>{response?.status ?? 'Not run yet'}</span>
-                </strong>
-              </div>
-              <div className={`stat-card ${isSending ? 'is-pulsing' : ''}`}>
-                <span className="stat-label">TTFT</span>
-                <strong>{formatMs(response?.ttftMs)}</strong>
-              </div>
-              <div className={`stat-card ${isSending ? 'is-pulsing' : ''}`}>
-                <span className="stat-label">Total time</span>
-                <strong>{formatMs(response?.totalMs)}</strong>
-              </div>
-              <div className={`stat-card ${isSending ? 'is-pulsing' : ''}`}>
-                <span className="stat-label">Estimated cost</span>
-                <strong>{formatCurrency(response?.costEstimateUsd)}</strong>
-              </div>
-            </div>
-
-            <div className="token-bar">
-              <span>Input {response?.usage.inputTokens ?? 'Pending'}</span>
-              <span>Output {response?.usage.outputTokens ?? 'Pending'}</span>
-              <span>Total {response?.usage.totalTokens ?? 'Pending'}</span>
-            </div>
-
-            {response?.errorHint ? <div className="error-banner">{response.errorHint}</div> : null}
-
-            <article className={`response-output ${isSending ? 'is-loading' : ''}`} aria-live="polite">
-              {responseText ? (
-                responseJsonPreview !== undefined ? (
-                  <pre className="json-response">
-                    <code>{renderJsonNode(responseJsonPreview)}</code>
-                  </pre>
-                ) : (
-                  <pre>{responseText}</pre>
-                )
-              ) : (
-                <div className="empty-state">
-                  <p className="empty-state__title">{isSending ? 'Waiting for the first tokens…' : 'Pick a template or build a request, then hit Send'}</p>
-                  <p className="empty-state__body">
-                    {isSending
-                      ? 'The model is processing your request. Streaming text will appear here as soon as it arrives.'
-                      : 'The response pane stays open here so you can compare output, timing, and token usage without digging through controls.'}
-                  </p>
-                  {isSending ? (
-                    <div className="typing-indicator" aria-label="Response in progress">
-                      <span />
-                      <span />
-                      <span />
-                    </div>
-                  ) : null}
-                  {!isSending ? (
-                    <p className="empty-state__hint">
-                      {isMobile ? 'Use the Send button pinned at the bottom of the screen.' : 'Use the Send button in the header above and to the right ↗'}
-                    </p>
-                  ) : null}
-                </div>
-              )}
-            </article>
-
-            {showRawResponse ? (
-              <div className="code-panel">
-                <CodeMirror
-                  value={responseJson}
-                  editable={false}
-                  height="320px"
-                  extensions={[json()]}
-                  theme={theme === 'dark' ? 'dark' : 'light'}
-                />
-              </div>
-            ) : null}
-
-            <details className="detail-panel">
-              <summary>Status code and headers</summary>
-              <pre>{JSON.stringify({ status: response?.status, headers: response?.headers ?? {} }, null, 2)}</pre>
-            </details>
-          </div>
-
-          <section className="surface">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">History</p>
-                <h3>Recent runs</h3>
-              </div>
-              <div className="section-heading__actions">
-                <button className="ghost-button" onClick={() => setHistoryOpen((open) => !open)}>
-                  {historyOpen ? 'Collapse' : 'Expand'}
-                </button>
-                <button className="ghost-button" onClick={clearHistory} disabled={history.length === 0}>
-                  Clear
-                </button>
-              </div>
-            </div>
-
-            {historyOpen ? (
-              <div className="history-list">
-                {history.length === 0 ? <p className="empty-state empty-state--compact">Your requests will appear here.</p> : null}
-                {history.map((item) => (
-                  <article key={item.id} className="history-card">
-                    <div className="history-card__top">
-                      <strong
-                        className="history-card__identity"
-                        title={`${providerOptions.find((provider) => provider.id === item.request.provider)?.label ?? item.request.provider} · ${item.request.model}`}
-                      >
-                        {providerOptions.find((provider) => provider.id === item.request.provider)?.label ?? item.request.provider}
-                        {' · '}
-                        {item.request.model}
-                      </strong>
-                    </div>
-                    <div className="history-card__subhead">
-                      <p>{new Date(item.timestamp).toLocaleString()}</p>
-                      <span className={`status-pill tone-${getStatusTone(item.response.status)}`}>
-                        <span className="status-indicator" aria-hidden="true" />
-                        <span>{item.response.status ?? 'error'}</span>
-                      </span>
-                    </div>
-                    <p className="history-meta">
-                      {item.requestPreview.url}
-                    </p>
-                    <p className="history-latency">Latency: {formatMs(item.response.totalMs)}</p>
-                    <p className="history-preview">{item.response.extractedText || item.response.rawText || 'No response body captured.'}</p>
-                    <div className="history-actions">
-                      <button className="secondary-button" onClick={() => replayHistory(item.id)}>
-                        Replay
-                      </button>
-                      <button className="ghost-button" onClick={() => deleteHistory(item.id)}>
-                        Delete
-                      </button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : null}
-          </section>
-        </section>
-
-        <aside className="control-column">
-          <details className="surface accordion-section" open={accordionOpen.provider}>
-            <summary
-              className="accordion-summary"
-              onClick={(event) => {
-                event.preventDefault();
-                toggleAccordionSection('provider');
-              }}
-            >
-              <div>
-                <p className="eyebrow">Request setup</p>
-                <h3>Provider &amp; Model</h3>
-                <p className="section-intro">Pick the target model quickly, then refine the prompt and payload below.</p>
-              </div>
-              <div className="accordion-summary__actions">
-                <span className="shortcut-hint">Cmd/Ctrl + K</span>
-                <button
-                  type="button"
-                  className="ghost-button"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    void fetchModels(true);
-                  }}
-                >
-                  Refresh models
-                </button>
-                <span className={`accordion-chevron ${accordionOpen.provider ? 'is-open' : ''}`} aria-hidden="true">
-                  ⌄
-                </span>
-              </div>
-            </summary>
-
-            <div className="provider-pills" role="tablist" aria-label="Provider selection">
-              {providerOptions.map((provider) => (
-                <button
-                  key={provider.id}
-                  className={`provider-pill ${request.provider === provider.id ? 'is-active' : ''}`}
-                  onClick={() => setProvider(provider.id)}
-                >
-                  {getProviderLabel(provider.id, isMobile)}
-                </button>
-              ))}
-            </div>
-
-            <div className="field-grid">
-              <label className="field">
-                <span>API key</span>
-                <input
-                  className="control-input"
-                  type="password"
-                  placeholder="Stored in localStorage only"
-                  value={request.apiKey}
-                  onChange={(event) => setRequestField('apiKey', event.target.value)}
-                />
-              </label>
-
-              <label className="field">
-                <span>Base URL</span>
-                <input
-                  className="control-input mono-text"
-                  value={request.baseUrl}
-                  onChange={(event) => setRequestField('baseUrl', event.target.value)}
-                  placeholder="Custom provider base URL"
-                />
-              </label>
-            </div>
-
-            <div className="model-search-panel">
-              <label className="field">
-                <span>Model search</span>
-                <input
-                  id="model-search-input"
-                  className="control-input"
-                  placeholder="Search models, providers, or IDs"
-                  value={modelSearch}
-                  onChange={(event) => setModelSearch(event.target.value)}
-                />
-              </label>
-
-              <label className="field">
-                <span>Selected model</span>
-                <input
-                  className="control-input mono-text"
-                  value={request.model}
-                  onChange={(event) => setRequestField('model', event.target.value)}
-                />
-              </label>
-
-              {modelsLoading ? <p className="helper-text">Loading models…</p> : null}
-              {modelsError ? <p className="error-text">{modelsError}</p> : null}
-
-              <div className="model-results" role="list">
-                {visibleModels.length > 0 ? (
-                  visibleModels.map((model) => (
-                    <button
-                      key={model.id}
-                      className={`model-option ${model.id === request.model ? 'is-active' : ''}`}
-                      onClick={() => setRequestField('model', model.id)}
-                      title={model.id}
-                    >
-                      <div className="model-option__row">
-                        <div className="model-option__identity">
-                          <strong>{model.name}</strong>
-                          <p className="model-option__id">{model.id}</p>
-                        </div>
-                        <div className="model-option__metrics">
-                          <span>{model.contextLength.toLocaleString()} ctx</span>
-                          <span>In ${(model.promptPricePerToken * 1_000_000).toFixed(2)}/1M</span>
-                          <span>Out ${(model.completionPricePerToken * 1_000_000).toFixed(2)}/1M</span>
-                        </div>
-                      </div>
-                      <div className="model-option__meta">
-                        <span>{model.provider}</span>
-                        <div className="badge-row">
-                          {capabilityBadges(model).map((badge) => (
-                            <span key={badge} className="mini-badge">
-                              {badge}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </button>
-                  ))
-                ) : (
-                  <p className="empty-state empty-state--compact">Type to search 300+ models.</p>
-                )}
-              </div>
-              {hasMoreModels ? (
-                <button className="secondary-button model-results__more" onClick={() => setShowAllModels(true)}>
-                  Show more
-                </button>
-              ) : null}
-            </div>
-
-            <div className="selected-model-card">
-              <span className="eyebrow">Active model</span>
-              <strong>{selectedModelInfo ? selectedModelInfo.name : request.model || 'Not selected'}</strong>
-              <p>
-                {selectedModelInfo
-                  ? `${selectedModelInfo.provider} · ${selectedModelInfo.contextLength.toLocaleString()} token context`
-                  : 'Not in the OpenRouter index. You can still send to custom-compatible endpoints.'}
-              </p>
-            </div>
-          </details>
-
-          <details className="surface accordion-section" open={accordionOpen.messages}>
-            <summary
-              className="accordion-summary"
-              onClick={(event) => {
-                event.preventDefault();
-                toggleAccordionSection('messages');
-              }}
-            >
-              <div>
-                <p className="eyebrow">Prompting</p>
-                <h3>Messages</h3>
-                <p className="section-intro">Messages use the same card structure across roles to keep edits predictable.</p>
-              </div>
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  addMessage();
-                }}
-              >
-                Add message
-              </button>
-              <span className={`accordion-chevron ${accordionOpen.messages ? 'is-open' : ''}`} aria-hidden="true">
-                ⌄
-              </span>
-            </summary>
-
-            <label className="field">
-              <span>System prompt</span>
-              <textarea
-                className="control-input control-textarea"
-                value={request.systemPrompt}
-                onChange={(event) => setRequestField('systemPrompt', event.target.value)}
-                placeholder="Set behavior, constraints, or persona"
-              />
-            </label>
-
-            <div className="template-strip" aria-label="Prompt templates">
-              {templates.map((template) => (
-                <button
-                  key={template.id}
-                  className={`template-chip ${activeTemplateId === template.id ? 'is-active' : ''}`}
-                  onClick={() => applyTemplate(template.id)}
-                >
-                  <span>{template.name}</span>
-                  <small>{template.description}</small>
-                </button>
-              ))}
-            </div>
-
-            <div className="message-list">
-              {request.messages.map((message, index) => (
-                <MessageBubble
-                  key={message.id}
-                  message={message}
-                  index={index}
-                  count={request.messages.length}
-                  onChange={updateMessage}
-                  onRemove={removeMessage}
-                  onMove={moveMessage}
-                />
-              ))}
-            </div>
-          </details>
-
-          <details className="surface accordion-section" open={accordionOpen.parameters}>
-            <summary
-              className="accordion-summary"
-              onClick={(event) => {
-                event.preventDefault();
-                toggleAccordionSection('parameters');
-              }}
-            >
-              <div>
-                <p className="eyebrow">Request tuning</p>
-                <h3>Parameters</h3>
-              </div>
-              <div className="accordion-summary__actions">
-                <label
-                  className="toggle-row"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={showRawRequest}
-                    onChange={(event) => setShowRawRequest(event.target.checked)}
-                  />
-                  <span>Raw JSON</span>
-                </label>
-                <button
-                  type="button"
-                  className="ghost-button"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    void onCopyCurl();
-                  }}
-                >
-                  Copy as cURL
-                </button>
-                <span className={`accordion-chevron ${accordionOpen.parameters ? 'is-open' : ''}`} aria-hidden="true">
-                  ⌄
-                </span>
-              </div>
-            </summary>
-
-            <div className="field-grid field-grid--metrics">
-              <label className="field">
-                <span>Temperature</span>
-                <input
-                  className="control-input"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="2"
-                  value={request.params.temperature}
-                  onChange={(event) => setParamsField('temperature', Number(event.target.value))}
-                />
-              </label>
-              <label className="field">
-                <span>Max tokens</span>
-                <input
-                  className="control-input"
-                  type="number"
-                  min="1"
-                  value={request.params.maxTokens}
-                  onChange={(event) => setParamsField('maxTokens', Number(event.target.value))}
-                />
-              </label>
-              <label className="field">
-                <span>Top P</span>
-                <input
-                  className="control-input"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="1"
-                  value={request.params.topP}
-                  onChange={(event) => setParamsField('topP', Number(event.target.value))}
-                />
-              </label>
-              <label className="toggle-card">
-                <span>
-                  <strong>Streaming</strong>
-                  <small>Receive tokens incrementally</small>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={request.params.stream}
-                  onChange={(event) => setParamsField('stream', event.target.checked)}
-                />
-              </label>
-            </div>
-
-            {showRawRequest ? (
-              <div className="code-panel">
-                <CodeMirror
-                  value={requestPreviewJson}
-                  editable={false}
-                  height="280px"
-                  extensions={[json()]}
-                  theme={theme === 'dark' ? 'dark' : 'light'}
-                />
-              </div>
-            ) : null}
-          </details>
-        </aside>
+      <main className={`workspace-grid ${showSetupFirst ? 'workspace-grid--setup' : ''}`}>
+        {showSetupFirst ? (
+          <>
+            {controlsPanel}
+            {responsePanel}
+          </>
+        ) : (
+          <>
+            {responsePanel}
+            {controlsPanel}
+          </>
+        )}
       </main>
 
       <div className="mobile-send-bar">

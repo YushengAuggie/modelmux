@@ -1,5 +1,13 @@
 import type { NormalizedUsage, RequestConfig, RequestPreview } from '@/types';
-import { joinUrl, numberOrUndefined, OPENAI_BASE, toOpenAiMessages, type ProviderAdapter } from '@/adapters/base';
+import {
+  getCustomBaseUrl,
+  joinUrl,
+  LOCAL_OPENAI_COMPAT_BASE,
+  numberOrUndefined,
+  OPENAI_BASE,
+  toOpenAiMessages,
+  type ProviderAdapter,
+} from '@/adapters/base';
 
 /** Builds an OpenAI Chat Completions request preview. */
 export function buildRequest(config: RequestConfig): RequestPreview {
@@ -8,10 +16,10 @@ export function buildRequest(config: RequestConfig): RequestPreview {
     throw new Error('Model is required');
   }
 
-  const base = config.provider === 'custom' ? config.baseUrl.trim() || 'http://localhost:11434/v1' : OPENAI_BASE;
-  // For custom providers, base URL often already includes /v1 (e.g. https://api.poe.com/v1),
-  // so only append /chat/completions. For built-in providers, append the full /v1/chat/completions.
-  const path = config.provider === 'custom' ? '/chat/completions' : '/v1/chat/completions';
+  const customBase = getCustomBaseUrl(config.baseUrl);
+  const useCustomPath = config.provider === 'custom' || Boolean(customBase);
+  const base = config.provider === 'custom' ? config.baseUrl.trim() || LOCAL_OPENAI_COMPAT_BASE : customBase || OPENAI_BASE;
+  const path = useCustomPath ? '/chat/completions' : '/v1/chat/completions';
   return {
     method: 'POST',
     url: joinUrl(base, path),
