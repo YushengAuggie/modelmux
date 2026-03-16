@@ -9,9 +9,12 @@ export function buildRequest(config: RequestConfig): RequestPreview {
   }
 
   const base = config.provider === 'custom' ? config.baseUrl.trim() || 'http://localhost:11434/v1' : OPENAI_BASE;
+  // For custom providers, base URL often already includes /v1 (e.g. https://api.poe.com/v1),
+  // so only append /chat/completions. For built-in providers, append the full /v1/chat/completions.
+  const path = config.provider === 'custom' ? '/chat/completions' : '/v1/chat/completions';
   return {
     method: 'POST',
-    url: joinUrl(base, '/v1/chat/completions'),
+    url: joinUrl(base, path),
     headers: {
       'content-type': 'application/json',
       authorization: `Bearer ${config.apiKey.trim()}`,

@@ -48,7 +48,7 @@ describe('buildRequestPreview', () => {
       baseUrl: '  ',
     });
 
-    expect(preview.url).toBe('http://localhost:11434/v1/v1/chat/completions');
+    expect(preview.url).toBe('http://localhost:11434/v1/chat/completions');
     expect(preview.headers.authorization).toBe('Bearer test-key');
   });
 
