@@ -17,6 +17,7 @@ export function buildRequest(config: RequestConfig): RequestPreview {
   const customBase = getCustomBaseUrl(config.baseUrl);
   const base = customBase || ANTHROPIC_BASE;
   const path = customBase ? '/messages' : '/v1/messages';
+  const model = config.model.trim().replace(/^anthropic\//, '');
   return {
     method: 'POST',
     url: joinUrl(base, path),
@@ -26,7 +27,7 @@ export function buildRequest(config: RequestConfig): RequestPreview {
       'anthropic-version': '2023-06-01',
     },
     body: {
-      model: config.model.trim(),
+      model,
       system: config.systemPrompt.trim() || undefined,
       messages: toAnthropicMessages(config.messages),
       temperature: config.params.temperature,

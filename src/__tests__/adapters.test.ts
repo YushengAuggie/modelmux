@@ -28,7 +28,7 @@ describe('buildRequestPreview', () => {
     expect(preview.url).toBe('https://api.openai.com/v1/chat/completions');
     expect(preview.headers.authorization).toBe('Bearer test-key');
     expect(preview.body).toMatchObject({
-      model: 'openai/gpt-4o-mini',
+      model: 'gpt-4o-mini',
       temperature: 0.4,
       max_tokens: 256,
       top_p: 0.9,
@@ -60,7 +60,7 @@ describe('buildRequestPreview', () => {
 
     expect(preview.url).toBe('https://api.openai.com/v1/responses');
     expect(preview.body).toMatchObject({
-      model: 'openai/gpt-4o-mini',
+      model: 'gpt-4o-mini',
       instructions: 'Be concise.',
       temperature: 0.4,
       top_p: 0.9,
@@ -105,7 +105,7 @@ describe('buildRequestPreview', () => {
     });
     expect(preview.body.messages).toEqual([
       { role: 'user', content: [{ type: 'text', text: 'Hello' }] },
-      { role: 'user', content: [{ type: 'text', text: 'result' }] },
+      { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'lookup', content: 'result' }] },
     ]);
   });
 
@@ -278,7 +278,7 @@ describe('copyAsCurl', () => {
     expect(curl).toContain('curl -X POST');
     expect(curl).toContain('"https://api.openai.com/v1/chat/completions"');
     expect(curl).toContain('"authorization: Bearer test-key"');
-    expect(curl).toContain('\\"model\\":\\"openai/gpt-4o-mini\\"');
+    expect(curl).toContain('\\"model\\":\\"gpt-4o-mini\\"');
   });
 });
 

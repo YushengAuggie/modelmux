@@ -66,7 +66,7 @@ function requestMatchesTemplate(
   );
 }
 
-function renderJsonNode(value: unknown, depth = 0): React.ReactNode {
+function renderJsonNode(value: unknown, depth = 0, path = ''): React.ReactNode {
   const indent = '  '.repeat(depth);
   const nextIndent = '  '.repeat(depth + 1);
 
@@ -76,14 +76,17 @@ function renderJsonNode(value: unknown, depth = 0): React.ReactNode {
       <>
         <span>[</span>
         {'\n'}
-        {value.map((item, index) => (
-          <span key={`${depth}-${index}`}>
-            {nextIndent}
-            {renderJsonNode(item, depth + 1)}
-            {index < value.length - 1 ? ',' : ''}
-            {'\n'}
-          </span>
-        ))}
+        {value.map((item, index) => {
+          const childPath = `${path}[${index}]`;
+          return (
+            <span key={childPath}>
+              {nextIndent}
+              {renderJsonNode(item, depth + 1, childPath)}
+              {index < value.length - 1 ? ',' : ''}
+              {'\n'}
+            </span>
+          );
+        })}
         {indent}
         <span>]</span>
       </>
@@ -97,16 +100,19 @@ function renderJsonNode(value: unknown, depth = 0): React.ReactNode {
       <>
         <span>{'{'}</span>
         {'\n'}
-        {entries.map(([key, item], index) => (
-          <span key={`${depth}-${key}`}>
-            {nextIndent}
-            <span className="json-key">"{key}"</span>
-            <span>: </span>
-            {renderJsonNode(item, depth + 1)}
-            {index < entries.length - 1 ? ',' : ''}
-            {'\n'}
-          </span>
-        ))}
+        {entries.map(([key, item], index) => {
+          const childPath = `${path}.${key}`;
+          return (
+            <span key={childPath}>
+              {nextIndent}
+              <span className="json-key">"{key}"</span>
+              <span>: </span>
+              {renderJsonNode(item, depth + 1, childPath)}
+              {index < entries.length - 1 ? ',' : ''}
+              {'\n'}
+            </span>
+          );
+        })}
         {indent}
         <span>{'}'}</span>
       </>
@@ -299,8 +305,9 @@ export default function App() {
     clearHistory,
   } = useAppStore();
 
-  const { streamText, send, copyRequestCurl, copyResponseText, clearStreamText } = useSendRequest();
+  const { streamText, validationError, send, copyRequestCurl, copyResponseText, clearStreamText } = useSendRequest();
   const apiKeyFieldRef = useRef<HTMLInputElement>(null);
+  const modelSearchInputRef = useRef<HTMLInputElement>(null);
   const providerSectionRef = useRef<HTMLElement>(null);
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -356,8 +363,7 @@ export default function App() {
       }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
-        const input = document.getElementById('model-search-input') as HTMLInputElement | null;
-        input?.focus();
+        modelSearchInputRef.current?.focus();
       }
     };
 
@@ -730,6 +736,7 @@ export default function App() {
           <label className="field">
             <span>Model search</span>
             <input
+              ref={modelSearchInputRef}
               id="model-search-input"
               className="control-input"
               placeholder="Search models, providers, or IDs"
@@ -992,6 +999,9 @@ export default function App() {
           </div>
         </div>
         <div className="header-actions">
+          {validationError ? (
+            <span className="error-text" role="alert">{validationError}</span>
+          ) : null}
           <div
             className="header-status"
             title={`${providerLabel} / ${request.model || 'Select a model'}`}

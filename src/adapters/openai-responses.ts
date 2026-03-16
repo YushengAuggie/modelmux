@@ -31,6 +31,7 @@ export function buildRequest(config: RequestConfig): RequestPreview {
   const customBase = getCustomBaseUrl(config.baseUrl);
   const base = customBase || OPENAI_BASE;
   const path = customBase ? '/responses' : '/v1/responses';
+  const model = config.model.trim().replace(/^openai\//, '');
   return {
     method: 'POST',
     url: joinUrl(base, path),
@@ -39,7 +40,7 @@ export function buildRequest(config: RequestConfig): RequestPreview {
       authorization: `Bearer ${config.apiKey.trim()}`,
     },
     body: {
-      model: config.model.trim(),
+      model,
       instructions: config.systemPrompt.trim() || undefined,
       input: config.messages.map((message) => ({ role: message.role, content: message.content })),
       temperature: config.params.temperature,

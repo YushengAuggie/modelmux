@@ -6,7 +6,11 @@ export const createHistorySlice: AppSlice<Pick<import('@/types').AppState, 'hist
   set,
 ) => ({
   history: [],
-  prependHistory: (item) => set((state) => ({ history: [item, ...state.history].slice(0, 100) })),
+  prependHistory: (item) =>
+    set((state) => {
+      const sanitized = { ...item, request: { ...item.request, apiKey: '' } };
+      return { history: [sanitized, ...state.history].slice(0, 100) };
+    }),
   replayHistory: (id) =>
     set((state) => {
       const item = state.history.find((entry) => entry.id === id);

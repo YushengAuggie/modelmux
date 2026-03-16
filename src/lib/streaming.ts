@@ -69,5 +69,18 @@ export async function readStreamingResponse(
     }
   }
 
+  // Flush any remaining buffer content after the stream ends
+  if (buffer.trim()) {
+    for (const data of parseSseData(buffer)) {
+      const json = parseJson(data);
+      finalJson = json;
+      const text = extractText(json);
+      if (text) {
+        streamedText += text;
+        onText(text);
+      }
+    }
+  }
+
   return { rawText, streamedText, finalJson, ttftMs };
 }

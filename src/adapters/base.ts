@@ -79,10 +79,24 @@ export function toOpenAiMessages(systemPrompt: string, messages: MessageItem[]):
 export function toAnthropicMessages(messages: MessageItem[]): Array<Record<string, unknown>> {
   return messages
     .filter((message) => message.role !== 'system')
-    .map((message) => ({
-      role: message.role === 'assistant' ? 'assistant' : 'user',
-      content: [{ type: 'text', text: normalizeMessageContent(message.content) }],
-    }));
+    .map((message) => {
+      if (message.role === 'tool') {
+        return {
+          role: 'user',
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: message.name ?? '',
+              content: normalizeMessageContent(message.content),
+            },
+          ],
+        };
+      }
+      return {
+        role: message.role === 'assistant' ? 'assistant' : 'user',
+        content: [{ type: 'text', text: normalizeMessageContent(message.content) }],
+      };
+    });
 }
 
 /** Converts messages into Gemini content parts. */

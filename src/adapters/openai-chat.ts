@@ -11,7 +11,7 @@ import {
 
 /** Builds an OpenAI Chat Completions request preview. */
 export function buildRequest(config: RequestConfig): RequestPreview {
-  const model = config.model.trim();
+  const model = config.model.trim().replace(/^openai\//, '');
   if (!model) {
     throw new Error('Model is required');
   }
@@ -34,6 +34,7 @@ export function buildRequest(config: RequestConfig): RequestPreview {
       max_tokens: config.params.maxTokens,
       top_p: config.params.topP,
       stream: config.params.stream,
+      ...(config.params.stream ? { stream_options: { include_usage: true } } : {}),
     },
   };
 }

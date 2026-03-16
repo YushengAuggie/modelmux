@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { buildRequestPreview, estimateCost, getAdapter } from '@/adapters';
 import { parseJson } from '@/adapters/base';
 import { copyAsCurl } from '@/lib/curl';
@@ -25,9 +25,39 @@ function modelById(models: OpenRouterModel[], modelId: string): OpenRouterModel 
 /** Sends requests and manages streaming text state for the shell. */
 export function useSendRequest() {
   const [streamText, setStreamText] = useState('');
+  const [validationError, setValidationError] = useState<string | undefined>(undefined);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const send = async (): Promise<void> => {
+  // Abort on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
+  const cancel = useCallback(() => {
+    abortControllerRef.current?.abort();
+  }, []);
+
+  const send = useCallback(async (): Promise<void> => {
     const state = useAppStore.getState();
+
+    // Pre-send validation
+    if (!state.request.apiKey.trim()) {
+      setValidationError('API key required');
+      return;
+    }
+    if (!state.request.model.trim()) {
+      setValidationError('Model required');
+      return;
+    }
+    setValidationError(undefined);
+
+    // Abort any in-flight request
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     const adapter = getAdapter(state.request.provider);
     const preview = buildRequestPreview(state.request);
     const model = modelById(state.models, state.request.model);
@@ -42,6 +72,7 @@ export function useSendRequest() {
         method: preview.method,
         headers: preview.headers,
         body: JSON.stringify(preview.body),
+        signal: controller.signal,
       });
       const headers = toHeadersRecord(transport.headers);
 
@@ -52,6 +83,9 @@ export function useSendRequest() {
       useAppStore.getState().setResponse(response);
       useAppStore.getState().prependHistory(createHistoryItem(structuredClone(state.request), response, preview));
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return;
+      }
       useAppStore.getState().setResponse({
         ok: false,
         headers: {},
@@ -64,7 +98,7 @@ export function useSendRequest() {
     } finally {
       useAppStore.getState().setIsSending(false);
     }
-  };
+  }, []);
 
   const copyRequestCurl = async (): Promise<void> => {
     await navigator.clipboard.writeText(copyAsCurl(buildRequestPreview(useAppStore.getState().request)));
@@ -75,7 +109,7 @@ export function useSendRequest() {
     await navigator.clipboard.writeText(streamText || response?.extractedText || '');
   };
 
-  return { streamText, send, copyRequestCurl, copyResponseText, clearStreamText: () => setStreamText('') };
+  return { streamText, validationError, send, cancel, copyRequestCurl, copyResponseText, clearStreamText: () => setStreamText('') };
 }
 
 async function handleStandardResponse(
