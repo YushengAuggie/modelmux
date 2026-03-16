@@ -31,9 +31,11 @@ export function buildRequest(config: RequestConfig): RequestPreview {
   // Use baseUrl when set (e.g. Poe API proxy), otherwise default to OpenAI
   const hasCustomBase = config.baseUrl && config.baseUrl.trim() && config.baseUrl.trim() !== 'http://localhost:11434/v1';
   const base = hasCustomBase ? config.baseUrl!.trim() : OPENAI_BASE;
+  // If custom base already ends with /v1, only append /responses
+  const path = hasCustomBase ? '/responses' : '/v1/responses';
   return {
     method: 'POST',
-    url: joinUrl(base, '/v1/responses'),
+    url: joinUrl(base, path),
     headers: {
       'content-type': 'application/json',
       authorization: `Bearer ${config.apiKey.trim()}`,
