@@ -444,7 +444,6 @@ export default function App() {
   const visibleModels = showAllModels ? filteredModels : filteredModels.slice(0, 5);
   const hasMoreModels = filteredModels.length > 5 && !showAllModels;
   const hasSentRequest = Boolean(response || history.length > 0 || isSending);
-  const showSetupFirst = !hasSentRequest;
   const authError = isAuthError(response);
 
   const onSend = () => {
@@ -476,19 +475,17 @@ export default function App() {
         <div className="response-headline">
           <div>
             <p className="eyebrow">Response</p>
-            <h2>{hasSentRequest ? 'Inspect output, timing, and errors in one place.' : 'Results appear here after your first request.'}</h2>
-            <p className="section-intro">
-              {hasSentRequest
-                ? 'Keep the response open while you compare model behavior, latency, and payload details.'
-                : 'Send a request to see results here.'}
-            </p>
+            <h2>Response output</h2>
           </div>
           <div className="response-headline__actions">
             <span className={`status-pill status-pill--response ${isSending ? 'is-live' : hasResponse ? 'is-ready' : ''}`}>
-              {isSending ? 'Streaming response' : hasResponse ? 'Response ready' : 'Waiting for request'}
+              {isSending ? 'Streaming' : hasResponse ? 'Ready' : 'Waiting'}
             </span>
             <button className="secondary-button" onClick={() => void onCopyResponseText()} disabled={!responseText}>
               Copy text
+            </button>
+            <button className="secondary-button" onClick={() => void onCopyCurl()}>
+              Copy as cURL
             </button>
             <label className="toggle-row">
               <input
@@ -501,33 +498,37 @@ export default function App() {
           </div>
         </div>
 
-        <div className="metric-chip-row" aria-label="Response metrics">
-          <span className={`metric-chip metric-chip--status tone-${statusTone} ${isSending ? 'is-pulsing' : ''}`}>
-            <span className="metric-chip__label">Status</span>
-            <strong className="status-value">
-              <span className="status-indicator" aria-hidden="true" />
-              <span>{response?.status ?? 'Not run yet'}</span>
-            </strong>
-          </span>
-          <span className={`metric-chip ${isSending ? 'is-pulsing' : ''}`}>
-            <span className="metric-chip__label">TTFT</span>
-            <strong>{formatMs(response?.ttftMs)}</strong>
-          </span>
-          <span className={`metric-chip ${isSending ? 'is-pulsing' : ''}`}>
-            <span className="metric-chip__label">Total time</span>
-            <strong>{formatMs(response?.totalMs)}</strong>
-          </span>
-          <span className={`metric-chip ${isSending ? 'is-pulsing' : ''}`}>
-            <span className="metric-chip__label">Cost</span>
-            <strong>{formatCurrency(response?.costEstimateUsd)}</strong>
-          </span>
-        </div>
+        {(hasResponse || isSending) ? (
+          <>
+            <div className="metric-chip-row" aria-label="Response metrics">
+              <span className={`metric-chip metric-chip--status tone-${statusTone} ${isSending ? 'is-pulsing' : ''}`}>
+                <span className="metric-chip__label">Status</span>
+                <strong className="status-value">
+                  <span className="status-indicator" aria-hidden="true" />
+                  <span>{response?.status ?? 'Not run yet'}</span>
+                </strong>
+              </span>
+              <span className={`metric-chip ${isSending ? 'is-pulsing' : ''}`}>
+                <span className="metric-chip__label">TTFT</span>
+                <strong>{formatMs(response?.ttftMs)}</strong>
+              </span>
+              <span className={`metric-chip ${isSending ? 'is-pulsing' : ''}`}>
+                <span className="metric-chip__label">Total time</span>
+                <strong>{formatMs(response?.totalMs)}</strong>
+              </span>
+              <span className={`metric-chip ${isSending ? 'is-pulsing' : ''}`}>
+                <span className="metric-chip__label">Cost</span>
+                <strong>{formatCurrency(response?.costEstimateUsd)}</strong>
+              </span>
+            </div>
 
-        <div className="token-bar">
-          <span>Input {response?.usage.inputTokens ?? 'Pending'}</span>
-          <span>Output {response?.usage.outputTokens ?? 'Pending'}</span>
-          <span>Total {response?.usage.totalTokens ?? 'Pending'}</span>
-        </div>
+            <div className="token-bar">
+              <span>Input {response?.usage.inputTokens ?? 'Pending'}</span>
+              <span>Output {response?.usage.outputTokens ?? 'Pending'}</span>
+              <span>Total {response?.usage.totalTokens ?? 'Pending'}</span>
+            </div>
+          </>
+        ) : null}
 
         {authError ? (
           <div className="error-banner error-banner--actionable" role="alert">
@@ -554,28 +555,16 @@ export default function App() {
             )
           ) : (
             <div className="empty-state empty-state--guided">
-              <div className="empty-state__art" aria-hidden="true">
-                <span />
-                <span />
-                <span />
-              </div>
-              <p className="empty-state__title">{isSending ? 'Waiting for the first tokens…' : 'Send a request to see results here'}</p>
-              <p className="empty-state__body">
-                {isSending
-                  ? 'The model is processing your request. Streaming text will appear here as soon as it arrives.'
-                  : '1. Pick a provider tab → 2. Enter your API key → 3. Choose a model → 4. Hit Send'}
+              <p className="empty-state__hint">
+                {isSending ? 'Waiting for tokens…' : 'Send a request to see results'}
               </p>
-              {!isSending ? (
-                <p className="empty-state__hint">
-                  {isMobile ? 'Your setup panel comes first on mobile.' : 'Start in Provider & Model, then come back here to compare results.'}
-                </p>
-              ) : (
+              {isSending ? (
                 <div className="typing-indicator" aria-label="Response in progress">
                   <span />
                   <span />
                   <span />
                 </div>
-              )}
+              ) : null}
             </div>
           )}
         </article>
@@ -666,12 +655,11 @@ export default function App() {
 
   const controlsPanel = (
     <aside className="control-column">
-      <section ref={providerSectionRef} className={`surface accordion-section surface--setup ${showSetupFirst ? 'surface--setup-active' : ''}`}>
+      <section ref={providerSectionRef} className="surface accordion-section surface--setup">
         <div className="accordion-summary accordion-summary--static">
           <div>
             <p className="eyebrow">Request setup</p>
             <h3>Provider &amp; Model</h3>
-            <p className="section-intro">Start here. Pick the provider, add credentials, then choose a model before sending.</p>
           </div>
           <div className="accordion-summary__actions">
             <span className="shortcut-hint">Cmd/Ctrl + K</span>
@@ -686,14 +674,6 @@ export default function App() {
             </button>
           </div>
         </div>
-
-        {!hasSentRequest ? (
-          <div className="getting-started-card" role="note" aria-label="Getting started">
-            <div className="getting-started-card__badge">Start here</div>
-            <p className="getting-started-card__title">Run your first request</p>
-            <p className="getting-started-card__steps">1. Pick a provider tab → 2. Enter your API key → 3. Choose a model → 4. Hit Send</p>
-          </div>
-        ) : null}
 
         <div className="provider-pills" role="tablist" aria-label="Provider selection">
           {providerOptions.map((provider) => (
@@ -742,15 +722,6 @@ export default function App() {
               placeholder="Search models, providers, or IDs"
               value={modelSearch}
               onChange={(event) => setModelSearch(event.target.value)}
-            />
-          </label>
-
-          <label className="field">
-            <span>Selected model</span>
-            <input
-              className="control-input mono-text"
-              value={request.model}
-              onChange={(event) => setRequestField('model', event.target.value)}
             />
           </label>
 
@@ -822,7 +793,6 @@ export default function App() {
           <div>
             <p className="eyebrow">Prompting</p>
             <h3>Messages</h3>
-            <p className="section-intro">Templates sit above the editor so you can start with a preset, then adjust the prompt.</p>
           </div>
           <div className="accordion-summary__actions">
             <button
@@ -891,7 +861,6 @@ export default function App() {
           <div>
             <p className="eyebrow">Advanced</p>
             <h3>Parameters</h3>
-            <p className="section-intro">Collapsed by default to keep the main flow focused on setup and prompting.</p>
           </div>
           <div className="accordion-summary__actions">
             <label
@@ -908,17 +877,6 @@ export default function App() {
               />
               <span>Raw JSON</span>
             </label>
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                void onCopyCurl();
-              }}
-            >
-              Copy as cURL
-            </button>
             <span className={`accordion-chevron ${accordionOpen.parameters ? 'is-open' : ''}`} aria-hidden="true">
               ⌄
             </span>
@@ -1019,6 +977,7 @@ export default function App() {
             <span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span>
             <span className="theme-toggle-button__label">{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
           </button>
+          <span className="shortcut-hint">⌘↵</span>
           <button
             className="primary-button primary-button--hero header-send-button"
             onClick={onSend}
@@ -1036,18 +995,9 @@ export default function App() {
         </div>
       </header>
 
-      <main className={`workspace-grid ${showSetupFirst ? 'workspace-grid--setup' : ''}`}>
-        {showSetupFirst ? (
-          <>
-            {controlsPanel}
-            {responsePanel}
-          </>
-        ) : (
-          <>
-            {responsePanel}
-            {controlsPanel}
-          </>
-        )}
+      <main className="workspace-grid">
+        {controlsPanel}
+        {responsePanel}
       </main>
 
       <div className="mobile-send-bar">
