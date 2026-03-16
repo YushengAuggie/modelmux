@@ -390,6 +390,8 @@ textarea::placeholder {
 .control-column {
   display: grid;
   gap: 20px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .response-column {
@@ -404,6 +406,8 @@ textarea::placeholder {
   border-radius: var(--radius-xl);
   background: color-mix(in srgb, var(--panel-strong) 88%, transparent);
   box-shadow: var(--shadow-md);
+  overflow: hidden;
+  min-width: 0;
 }
 
 .surface--hero {
@@ -928,6 +932,7 @@ textarea::placeholder {
   padding-bottom: 4px;
   scrollbar-width: thin;
   scroll-snap-type: x proximity;
+  max-width: 100%;
 }
 
 .provider-pill {
@@ -1321,6 +1326,9 @@ textarea::placeholder {
 
 .accordion-section {
   gap: 14px;
+  overflow: hidden;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .accordion-summary {
