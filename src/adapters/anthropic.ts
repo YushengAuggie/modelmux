@@ -18,15 +18,20 @@ export function buildRequest(config: RequestConfig): RequestPreview {
   const base = customBase || ANTHROPIC_BASE;
   const path = customBase ? '/messages' : '/v1/messages';
   const model = config.model.trim().replace(/^anthropic\//, '');
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    'x-api-key': config.apiKey.trim(),
+    'anthropic-version': '2023-06-01',
+  };
+  // Only send the direct-browser-access header to the real Anthropic API.
+  // Custom endpoints (like Poe) don't allow it in their CORS preflight.
+  if (!customBase) {
+    headers['anthropic-dangerous-direct-browser-access'] = 'true';
+  }
   return {
     method: 'POST',
     url: joinUrl(base, path),
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': config.apiKey.trim(),
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
+    headers,
     body: {
       model,
       system: config.systemPrompt.trim() || undefined,
