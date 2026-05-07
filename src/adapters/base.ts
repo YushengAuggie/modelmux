@@ -53,13 +53,25 @@ const OFFICIAL_ORIGINS: string[] = [
 
 /** Returns a custom override base URL when it should replace provider defaults. */
 export function getCustomBaseUrl(baseUrl: string): string | undefined {
-  const trimmed = baseUrl.trim().replace(/\/+$/, '');
+  let trimmed = baseUrl.trim().replace(/\/+$/, '');
   if (!trimmed || trimmed === LOCAL_OPENAI_COMPAT_BASE) {
     return undefined;
   }
   // Treat official API URLs as "no override" so the adapter uses its own default paths.
   if (OFFICIAL_ORIGINS.some((origin) => trimmed.toLowerCase() === origin.toLowerCase())) {
     return undefined;
+  }
+  // Auto-upgrade http → https for non-local endpoints when the page is served over HTTPS.
+  // This prevents "Mixed Content" errors from a simple typo.
+  if (
+    typeof window !== 'undefined' &&
+    window.location.protocol === 'https:' &&
+    trimmed.startsWith('http://') &&
+    !trimmed.match(/^http:\/\/(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)(:|\/)/) &&
+    !trimmed.match(/^http:\/\/\d+\.\d+\.\d+\.\d+(:|\/)/) &&
+    !trimmed.match(/^http:\/\/[^./]+(:|\/)/) // single-word hosts like http://myserver:8080
+  ) {
+    trimmed = 'https://' + trimmed.slice(7);
   }
   return trimmed;
 }
