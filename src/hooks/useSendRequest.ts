@@ -91,11 +91,13 @@ export function useSendRequest() {
       let errorHint: string;
       if (lowerMessage.includes('failed to fetch') || lowerMessage.includes('networkerror') || lowerMessage.includes('load failed')) {
         const provider = state.request.provider;
-        if (provider === 'anthropic') {
+        const baseUrl = state.request.baseUrl.trim();
+        const hasCustomBase = Boolean(baseUrl) && !baseUrl.startsWith('http://localhost') && !baseUrl.startsWith('http://127.0.0.1');
+        if (provider === 'anthropic' && !hasCustomBase) {
           errorHint = 'CORS blocked. Anthropic requires the `anthropic-dangerous-direct-browser-access` header for browser requests. Make sure you are using the latest build.';
-        } else if (state.request.baseUrl.trim() && state.request.baseUrl.startsWith('http://') && window.location.protocol === 'https:') {
+        } else if (baseUrl && baseUrl.startsWith('http://') && window.location.protocol === 'https:') {
           errorHint = 'Mixed content: this HTTPS page cannot make requests to an HTTP endpoint. Use an HTTPS URL or run a local proxy.';
-        } else if (state.request.baseUrl.includes('localhost') || state.request.baseUrl.includes('127.0.0.1')) {
+        } else if (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1')) {
           errorHint = 'Cannot reach local server. Make sure it is running and allows CORS from this origin.';
         } else {
           errorHint = 'Network error — the browser blocked the request (likely CORS). Check that the endpoint URL is correct and the server allows cross-origin requests.';

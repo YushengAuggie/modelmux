@@ -67,9 +67,9 @@ export function getCustomBaseUrl(baseUrl: string): string | undefined {
     typeof window !== 'undefined' &&
     window.location.protocol === 'https:' &&
     trimmed.startsWith('http://') &&
-    !trimmed.match(/^http:\/\/(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)(:|\/)/) &&
-    !trimmed.match(/^http:\/\/\d+\.\d+\.\d+\.\d+(:|\/)/) &&
-    !trimmed.match(/^http:\/\/[^./]+(:|\/)/) // single-word hosts like http://myserver:8080
+    !trimmed.match(/^http:\/\/(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)(:|\/|$)/) &&
+    !trimmed.match(/^http:\/\/\d+\.\d+\.\d+\.\d+(:|\/|$)/) &&
+    !trimmed.match(/^http:\/\/[^./]+(:|\/|$)/) // single-word hosts like http://myserver:8080
   ) {
     trimmed = 'https://' + trimmed.slice(7);
   }

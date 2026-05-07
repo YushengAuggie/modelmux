@@ -17,7 +17,9 @@ export function buildRequest(config: RequestConfig): RequestPreview {
   const customBase = getCustomBaseUrl(config.baseUrl);
   const base = customBase || ANTHROPIC_BASE;
   const path = customBase ? '/messages' : '/v1/messages';
-  const model = config.model.trim().replace(/^anthropic\//, '');
+  // Only strip anthropic/ prefix for official Anthropic endpoint, not custom proxies
+  const rawModel = config.model.trim();
+  const model = customBase ? rawModel : rawModel.replace(/^anthropic\//, '');
   const headers: Record<string, string> = {
     'content-type': 'application/json',
     'x-api-key': config.apiKey.trim(),

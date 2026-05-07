@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildRequestPreview, getAdapter } from '@/adapters';
+import { getCustomBaseUrl } from '@/adapters/base';
 import { copyAsCurl } from '@/lib/curl';
 import type { RequestConfig } from '@/types';
 
@@ -92,7 +93,7 @@ describe('buildRequestPreview', () => {
     expect(preview.url).toBe('https://proxy.example.com/v1/responses');
   });
 
-  it('builds Anthropic previews with required headers', () => {
+  it('builds Anthropic previews with required headers and direct-browser-access', () => {
     const preview = buildRequestPreview({
       ...baseConfig,
       provider: 'anthropic',
@@ -102,11 +103,23 @@ describe('buildRequestPreview', () => {
     expect(preview.headers).toMatchObject({
       'x-api-key': 'test-key',
       'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
     });
     expect(preview.body.messages).toEqual([
       { role: 'user', content: [{ type: 'text', text: 'Hello' }] },
       { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'lookup', content: 'result' }] },
     ]);
+  });
+
+  it('omits anthropic-dangerous-direct-browser-access for custom Anthropic endpoints', () => {
+    const preview = buildRequestPreview({
+      ...baseConfig,
+      provider: 'anthropic',
+      baseUrl: 'https://api.poe.com/v1',
+    });
+
+    expect(preview.url).toBe('https://api.poe.com/v1/messages');
+    expect(preview.headers['anthropic-dangerous-direct-browser-access']).toBeUndefined();
   });
 
   it('uses a custom base URL for Anthropic providers', () => {
@@ -117,6 +130,50 @@ describe('buildRequestPreview', () => {
     });
 
     expect(preview.url).toBe('https://proxy.example.com/v1/messages');
+  });
+
+  it('preserves model name for custom providers (no prefix stripping)', () => {
+    const preview = buildRequestPreview({
+      ...baseConfig,
+      provider: 'custom',
+      model: 'openai/gpt-4o-mini',
+      baseUrl: 'https://api.poe.com/v1',
+    });
+
+    expect(preview.body.model).toBe('openai/gpt-4o-mini');
+  });
+
+  it('preserves model name for Anthropic custom endpoints', () => {
+    const preview = buildRequestPreview({
+      ...baseConfig,
+      provider: 'anthropic',
+      model: 'Claude-3.5-Haiku',
+      baseUrl: 'https://api.poe.com/v1',
+    });
+
+    expect(preview.body.model).toBe('Claude-3.5-Haiku');
+  });
+
+  it('preserves model name for Responses API custom endpoints', () => {
+    const preview = buildRequestPreview({
+      ...baseConfig,
+      provider: 'openai-responses',
+      model: 'openai/gpt-4o-mini',
+      baseUrl: 'https://api.poe.com/v1',
+    });
+
+    expect(preview.body.model).toBe('openai/gpt-4o-mini');
+  });
+
+  it('strips openai/ prefix for official OpenAI endpoints', () => {
+    const preview = buildRequestPreview({
+      ...baseConfig,
+      provider: 'openai-chat',
+      model: 'openai/gpt-4o-mini',
+      baseUrl: '',
+    });
+
+    expect(preview.body.model).toBe('gpt-4o-mini');
   });
 
   it('builds Gemini previews with model in URL path', () => {
@@ -279,6 +336,41 @@ describe('copyAsCurl', () => {
     expect(curl).toContain('"https://api.openai.com/v1/chat/completions"');
     expect(curl).toContain('"authorization: Bearer test-key"');
     expect(curl).toContain('\\"model\\":\\"gpt-4o-mini\\"');
+  });
+});
+
+describe('getCustomBaseUrl', () => {
+  it('returns undefined for empty base URL', () => {
+    expect(getCustomBaseUrl('')).toBeUndefined();
+    expect(getCustomBaseUrl('  ')).toBeUndefined();
+  });
+
+  it('returns undefined for the default local base', () => {
+    expect(getCustomBaseUrl('http://localhost:11434/v1')).toBeUndefined();
+  });
+
+  it('returns undefined for official OpenAI URL', () => {
+    expect(getCustomBaseUrl('https://api.openai.com')).toBeUndefined();
+    expect(getCustomBaseUrl('https://api.openai.com/v1')).toBeUndefined();
+    expect(getCustomBaseUrl('https://api.openai.com/v1/')).toBeUndefined();
+  });
+
+  it('returns undefined for official Anthropic URL', () => {
+    expect(getCustomBaseUrl('https://api.anthropic.com')).toBeUndefined();
+    expect(getCustomBaseUrl('https://api.anthropic.com/v1')).toBeUndefined();
+  });
+
+  it('returns undefined for official Gemini URL', () => {
+    expect(getCustomBaseUrl('https://generativelanguage.googleapis.com')).toBeUndefined();
+  });
+
+  it('returns custom URLs as-is', () => {
+    expect(getCustomBaseUrl('https://api.poe.com/v1')).toBe('https://api.poe.com/v1');
+    expect(getCustomBaseUrl('https://proxy.example.com')).toBe('https://proxy.example.com');
+  });
+
+  it('strips trailing slashes', () => {
+    expect(getCustomBaseUrl('https://api.poe.com/v1/')).toBe('https://api.poe.com/v1');
   });
 });
 
