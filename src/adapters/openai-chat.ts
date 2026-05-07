@@ -11,7 +11,9 @@ import {
 
 /** Builds an OpenAI Chat Completions request preview. */
 export function buildRequest(config: RequestConfig): RequestPreview {
-  const model = config.model.trim().replace(/^openai\//, '');
+  // Only strip the openai/ prefix for official OpenAI endpoints, not custom providers
+  const rawModel = config.model.trim();
+  const model = config.provider === 'custom' ? rawModel : rawModel.replace(/^openai\//, '');
   if (!model) {
     throw new Error('Model is required');
   }
