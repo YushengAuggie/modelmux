@@ -208,9 +208,9 @@ function getProviderLabel(provider: ProviderId, compact: boolean): string {
 }
 
 function isAuthError(response?: ResponseState): boolean {
-  if (!response) return false;
+  if (!response || response.ok) return false;
   if (response.status === 401 || response.status === 403) return true;
-  return /invalid api key|api key|unauthorized|forbidden/i.test(response.rawText);
+  return /invalid.*api.?key|incorrect.*api.?key|authentication.*(?:failed|error|invalid)/i.test(response.rawText);
 }
 
 function MessageBubble({
@@ -533,8 +533,8 @@ export default function App() {
         {authError ? (
           <div className="error-banner error-banner--actionable" role="alert">
             <div>
-              <strong>Invalid API key</strong>
-              <p>Check your key in the Provider &amp; Model section.</p>
+              <strong>Authentication failed</strong>
+              <p>{response?.errorHint || 'Check your API key in the Provider & Model section. Make sure you\'re using a key for the correct provider (e.g. an OpenAI key for OpenAI, not an OpenRouter key).'}</p>
             </div>
             <button className="secondary-button" onClick={focusApiKeyField}>
               Go to API key
@@ -706,9 +706,9 @@ export default function App() {
               className="control-input mono-text"
               value={request.baseUrl}
               onChange={(event) => setRequestField('baseUrl', event.target.value)}
-              placeholder="Optional proxy or gateway URL"
+              placeholder="https://your-proxy.example.com/v1"
             />
-            <small className="field-hint">Optional override for any provider. Leave the default value to use official provider endpoints.</small>
+            <small className="field-hint">Optional override. Leave empty to use official endpoints. Use HTTPS for hosted pages.</small>
           </label>
         </div>
 

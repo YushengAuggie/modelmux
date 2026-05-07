@@ -51,6 +51,10 @@ export function useSendRequest() {
       setValidationError('Model required');
       return;
     }
+    if (state.request.provider === 'custom' && !state.request.baseUrl.trim()) {
+      setValidationError('Base URL required for custom provider');
+      return;
+    }
     setValidationError(undefined);
 
     // Abort any in-flight request

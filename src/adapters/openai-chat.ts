@@ -19,8 +19,14 @@ export function buildRequest(config: RequestConfig): RequestPreview {
   }
 
   const customBase = getCustomBaseUrl(config.baseUrl);
+  const rawBaseUrl = config.baseUrl.trim();
   const useCustomPath = config.provider === 'custom' || Boolean(customBase);
-  const base = config.provider === 'custom' ? config.baseUrl.trim() || LOCAL_OPENAI_COMPAT_BASE : customBase || OPENAI_BASE;
+  // For custom providers, prefer the auto-upgraded URL from getCustomBaseUrl
+  // (which handles http→https for non-local endpoints on HTTPS pages),
+  // then fall back to the raw URL or the default local endpoint.
+  const base = config.provider === 'custom'
+    ? (customBase ?? (rawBaseUrl || LOCAL_OPENAI_COMPAT_BASE))
+    : (customBase || OPENAI_BASE);
   const path = useCustomPath ? '/chat/completions' : '/v1/chat/completions';
   return {
     method: 'POST',

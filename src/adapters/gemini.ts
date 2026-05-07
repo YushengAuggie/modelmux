@@ -3,12 +3,14 @@ import { GEMINI_BASE, getCustomBaseUrl, joinUrl, numberOrUndefined, toGeminiCont
 
 /** Builds a Gemini generateContent request preview. */
 export function buildRequest(config: RequestConfig): RequestPreview {
-  const model = config.model.trim();
-  if (!model) {
+  const rawModel = config.model.trim();
+  if (!rawModel) {
     throw new Error('Model is required');
   }
 
   const customBase = getCustomBaseUrl(config.baseUrl);
+  // Strip google/ prefix for official Gemini endpoint, keep as-is for custom proxies
+  const model = customBase ? rawModel : rawModel.replace(/^google\//, '');
   const path = config.params.stream
     ? `${customBase ? '' : '/v1beta'}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`
     : `${customBase ? '' : '/v1beta'}/models/${encodeURIComponent(model)}:generateContent`;

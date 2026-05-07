@@ -31,7 +31,8 @@ export const createRequestSlice: AppSlice<Pick<import('@/types').AppState, 'requ
       if (provider === 'openai-responses') request.model = 'openai/gpt-4.1';
       if (provider === 'custom') {
         request.model = state.request.model || 'llama3';
-        request.baseUrl = state.request.baseUrl || 'http://localhost:11434/v1';
+        // Don't auto-fill with http://localhost — causes mixed-content errors
+        // on HTTPS-hosted pages. The "Local model" template sets this explicitly.
       } else {
         request.baseUrl = '';
       }
