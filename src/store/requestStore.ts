@@ -7,7 +7,7 @@ export const defaultRequest: RequestConfig = {
   provider: 'openai-chat',
   model: 'openai/gpt-4o-mini',
   apiKey: '',
-  baseUrl: 'http://localhost:11434/v1',
+  baseUrl: '',
   systemPrompt: 'You are a helpful assistant.',
   messages: [{ id: crypto.randomUUID(), role: 'user', content: 'Hello, what can you do?' }],
   params: { temperature: 0.7, maxTokens: 800, topP: 1, stream: false },
@@ -32,6 +32,8 @@ export const createRequestSlice: AppSlice<Pick<import('@/types').AppState, 'requ
       if (provider === 'custom') {
         request.model = state.request.model || 'llama3';
         request.baseUrl = state.request.baseUrl || 'http://localhost:11434/v1';
+      } else {
+        request.baseUrl = '';
       }
       return { request, response: undefined };
     }),

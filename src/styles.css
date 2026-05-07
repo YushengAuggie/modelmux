@@ -850,6 +850,13 @@ textarea::placeholder {
   color: var(--muted);
 }
 
+.history-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
 .history-card__identity {
   display: block;
   color: var(--text);
@@ -1668,12 +1675,14 @@ textarea::placeholder {
 
   .response-headline__actions,
   .section-heading__actions {
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
   }
 
   .response-headline__actions > *,
   .section-heading__actions > * {
-    width: 100%;
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
   .token-bar {
@@ -1773,6 +1782,11 @@ textarea::placeholder {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    max-width: 100%;
+  }
+
+  .history-preview {
+    word-break: break-word;
   }
 
   .history-card__summary {

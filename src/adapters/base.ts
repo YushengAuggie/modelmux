@@ -41,10 +41,24 @@ export function joinUrl(base: string, path: string): string {
   return `${base.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
 }
 
+/** Known official API origins — if a user pastes one of these, treat it the same as empty. */
+const OFFICIAL_ORIGINS: string[] = [
+  OPENAI_BASE,
+  `${OPENAI_BASE}/v1`,
+  ANTHROPIC_BASE,
+  `${ANTHROPIC_BASE}/v1`,
+  GEMINI_BASE,
+  `${GEMINI_BASE}/v1beta`,
+];
+
 /** Returns a custom override base URL when it should replace provider defaults. */
 export function getCustomBaseUrl(baseUrl: string): string | undefined {
-  const trimmed = baseUrl.trim();
+  const trimmed = baseUrl.trim().replace(/\/+$/, '');
   if (!trimmed || trimmed === LOCAL_OPENAI_COMPAT_BASE) {
+    return undefined;
+  }
+  // Treat official API URLs as "no override" so the adapter uses its own default paths.
+  if (OFFICIAL_ORIGINS.some((origin) => trimmed.toLowerCase() === origin.toLowerCase())) {
     return undefined;
   }
   return trimmed;

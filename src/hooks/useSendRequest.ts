@@ -86,14 +86,31 @@ export function useSendRequest() {
       if (error instanceof DOMException && error.name === 'AbortError') {
         return;
       }
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const lowerMessage = errorMessage.toLowerCase();
+      let errorHint: string;
+      if (lowerMessage.includes('failed to fetch') || lowerMessage.includes('networkerror') || lowerMessage.includes('load failed')) {
+        const provider = state.request.provider;
+        if (provider === 'anthropic') {
+          errorHint = 'CORS blocked. Anthropic requires the `anthropic-dangerous-direct-browser-access` header for browser requests. Make sure you are using the latest build.';
+        } else if (state.request.baseUrl.trim() && state.request.baseUrl.startsWith('http://') && window.location.protocol === 'https:') {
+          errorHint = 'Mixed content: this HTTPS page cannot make requests to an HTTP endpoint. Use an HTTPS URL or run a local proxy.';
+        } else if (state.request.baseUrl.includes('localhost') || state.request.baseUrl.includes('127.0.0.1')) {
+          errorHint = 'Cannot reach local server. Make sure it is running and allows CORS from this origin.';
+        } else {
+          errorHint = 'Network error — the browser blocked the request (likely CORS). Check that the endpoint URL is correct and the server allows cross-origin requests.';
+        }
+      } else {
+        errorHint = `Request failed: ${errorMessage}`;
+      }
       useAppStore.getState().setResponse({
         ok: false,
         headers: {},
-        rawText: String(error instanceof Error ? error.message : error),
+        rawText: errorMessage,
         json: undefined,
         extractedText: '',
         usage: {},
-        errorHint: 'Request failed before receiving a response. Check endpoint, key, and CORS policy.',
+        errorHint,
       });
     } finally {
       useAppStore.getState().setIsSending(false);
