@@ -30,7 +30,10 @@ export function buildRequest(config: RequestConfig): RequestPreview {
 
   const customBase = getCustomBaseUrl(config.baseUrl);
   const base = customBase || OPENAI_BASE;
-  const path = customBase ? '/responses' : '/v1/responses';
+
+  const defaultPath = customBase ? '/responses' : '/v1/responses';
+  const endpointOverride = (config.endpointPath ?? '').trim();
+  const path = endpointOverride || defaultPath;
   // Only strip the openai/ prefix for official OpenAI endpoints, not custom proxies
   const rawModel = config.model.trim();
   const model = customBase ? rawModel : rawModel.replace(/^openai\//, '');

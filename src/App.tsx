@@ -170,6 +170,16 @@ function capabilityBadges(model: OpenRouterModel): string[] {
   return badges;
 }
 
+function getDefaultEndpointPath(provider: ProviderId): string {
+  switch (provider) {
+    case 'anthropic': return '/v1/messages';
+    case 'gemini': return '/v1beta/models/{model}:generateContent';
+    case 'openai-responses': return '/v1/responses';
+    case 'openai-chat':
+    default: return '/v1/chat/completions';
+  }
+}
+
 function providerTone(provider: ProviderId): string {
   switch (provider) {
     case 'openai-chat':
@@ -708,7 +718,18 @@ export default function App() {
               onChange={(event) => setRequestField('baseUrl', event.target.value)}
               placeholder="https://your-proxy.example.com/v1"
             />
-            <small className="field-hint">Optional override. Leave empty to use official endpoints. Use HTTPS for hosted pages.</small>
+            <small className="field-hint">Optional. Leave empty for official endpoints. Use HTTPS for hosted pages.</small>
+          </label>
+
+          <label className="field">
+            <span>Endpoint path <small className="field-hint--inline">(optional override)</small></span>
+            <input
+              className="control-input mono-text"
+              value={request.endpointPath ?? ''}
+              onChange={(event) => setRequestField('endpointPath', event.target.value)}
+              placeholder={getDefaultEndpointPath(request.provider)}
+            />
+            <small className="field-hint">Overrides the default path for this provider. Leave empty to use the default shown as placeholder.</small>
           </label>
         </div>
 

@@ -11,9 +11,12 @@ export function buildRequest(config: RequestConfig): RequestPreview {
   const customBase = getCustomBaseUrl(config.baseUrl);
   // Strip google/ prefix for official Gemini endpoint, keep as-is for custom proxies
   const model = customBase ? rawModel : rawModel.replace(/^google\//, '');
-  const path = config.params.stream
+
+  const endpointOverride = (config.endpointPath ?? '').trim();
+  const defaultPath = config.params.stream
     ? `${customBase ? '' : '/v1beta'}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`
     : `${customBase ? '' : '/v1beta'}/models/${encodeURIComponent(model)}:generateContent`;
+  const path = endpointOverride || defaultPath;
 
   return {
     method: 'POST',

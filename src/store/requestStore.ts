@@ -8,6 +8,7 @@ export const defaultRequest: RequestConfig = {
   model: 'openai/gpt-4o-mini',
   apiKey: '',
   baseUrl: '',
+  endpointPath: '',
   systemPrompt: 'You are a helpful assistant.',
   messages: [{ id: crypto.randomUUID(), role: 'user', content: 'Hello, what can you do?' }],
   params: { temperature: 0.7, maxTokens: 800, topP: 1, stream: false },

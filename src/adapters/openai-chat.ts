@@ -27,7 +27,10 @@ export function buildRequest(config: RequestConfig): RequestPreview {
   const base = config.provider === 'custom'
     ? (customBase ?? (rawBaseUrl || LOCAL_OPENAI_COMPAT_BASE))
     : (customBase || OPENAI_BASE);
-  const path = useCustomPath ? '/chat/completions' : '/v1/chat/completions';
+
+  const defaultPath = useCustomPath ? '/chat/completions' : '/v1/chat/completions';
+  const endpointOverride = (config.endpointPath ?? '').trim();
+  const path = endpointOverride || defaultPath;
   return {
     method: 'POST',
     url: joinUrl(base, path),

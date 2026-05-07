@@ -25,7 +25,10 @@ export interface RequestConfig {
   provider: ProviderId;
   model: string;
   apiKey: string;
+  /** Optional base URL override (origin + optional prefix, e.g. https://api.poe.com/v1). */
   baseUrl: string;
+  /** Optional endpoint override (path only, e.g. /v1/chat/completions or /messages). */
+  endpointPath?: string;
   systemPrompt: string;
   messages: MessageItem[];
   params: ParamsState;
